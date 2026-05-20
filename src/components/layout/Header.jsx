@@ -7,6 +7,7 @@ export function Header({ user, onNuevaFactura }) {
   const [time, setTime]         = useState(new Date())
   const [aiPulse, setAiPulse]   = useState(false)
   const [notifs, setNotifs]     = useState(false)
+  const [hasUnread, setHasUnread] = useState(true)
 
   useEffect(() => {
     const t1 = setInterval(() => setTime(new Date()), 30000)
@@ -53,7 +54,7 @@ export function Header({ user, onNuevaFactura }) {
         {/* Notifications */}
         <div style={{ position: 'relative' }}>
           <div
-            onClick={() => setNotifs(v => !v)}
+            onClick={() => { setNotifs(v => !v); setHasUnread(false) }}
             style={{
               width: 34, height: 34, borderRadius: 8, cursor: 'pointer',
               background: notifs ? 'var(--surface3)' : 'var(--surface2)',
@@ -61,13 +62,15 @@ export function Header({ user, onNuevaFactura }) {
               display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15,
               transition: 'background .15s',
             }}>🔔</div>
-          <div style={{
-            position: 'absolute', top: -3, right: -3,
-            width: 14, height: 14, borderRadius: '50%',
-            background: 'var(--red)', border: '2px solid var(--bg)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 8, fontFamily: 'var(--font-ui)', fontWeight: 800, color: 'white',
-          }}>!</div>
+          {hasUnread && (
+            <div style={{
+              position: 'absolute', top: -3, right: -3,
+              width: 14, height: 14, borderRadius: '50%',
+              background: 'var(--red)', border: '2px solid var(--bg)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 8, fontFamily: 'var(--font-ui)', fontWeight: 800, color: 'white',
+            }}>!</div>
+          )}
           {notifs && <NotificationsPanel onClose={() => setNotifs(false)} />}
         </div>
 
