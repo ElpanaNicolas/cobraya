@@ -5,6 +5,7 @@ import { TrendChart }   from '@/components/dashboard/TrendChart'
 import { ActivityFeed } from '@/components/dashboard/ActivityFeed'
 import { InvoiceTable } from '@/components/invoices/InvoiceTable'
 import { toast } from '@/components/ui/Toast'
+import { MonthlyReportButton } from '@/components/reports/MonthlyReport'
 
 export function Dashboard() {
   const kpis      = useApi(api.getKPIs)
@@ -40,6 +41,11 @@ export function Dashboard() {
 
   return (
     <div className="page-pad" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+      {/* Header row */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+        <MonthlyReportButton />
+      </div>
 
       {/* KPIs */}
       <KPICards data={kpis.data} loading={kpis.loading} />

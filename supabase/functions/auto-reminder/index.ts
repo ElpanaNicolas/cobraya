@@ -7,6 +7,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { callClaude } from '../_shared/claude.ts'
+import { sendEmail, reminderEmailHtml } from '../_shared/resend.ts'
 
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL')!,
@@ -96,7 +97,7 @@ serve(async (req) => {
 
       const { data: pendingInvoices } = await supabase
         .from('invoices')
-        .select('id, cfe_id, amount, due, clients(id, name, phone)')
+        .select('id, cfe_id, amount, due, clients(id, name, phone, email)')
         .eq('profile_id', profile.id)
         .eq('status', 'pending')
         .lte('due', firstReminderCutoff.toISOString().split('T')[0])
@@ -137,7 +138,27 @@ serve(async (req) => {
             status: 'sent',
           })
           await supabase.from('invoices').update({ status: 'reminded' }).eq('id', inv.id)
-          await sendWhatsApp(client.phone, msg, twilioSid, twilioToken, twilioFrom)
+
+          // WhatsApp
+          if (cfg.channel_whatsapp !== false) {
+            await sendWhatsApp(client.phone, msg, twilioSid, twilioToken, twilioFrom)
+          }
+
+          // Email
+          if (cfg.channel_email !== false && client.email) {
+            await sendEmail({
+              to:      client.email,
+              subject: `Recordatorio de pago — Factura ${inv.cfe_id}`,
+              html:    reminderEmailHtml({
+                clientName:  client.name,
+                company:     profile.company ?? 'la empresa',
+                cfeId:       inv.cfe_id,
+                amount:      Number(inv.amount),
+                due:         inv.due,
+                messageBody: msg,
+              }),
+            })
+          }
 
           console.log(`✓ Recordatorio enviado: factura ${inv.cfe_id} → ${client.name}`)
           stats.sent++
@@ -153,7 +174,7 @@ serve(async (req) => {
 
       const { data: remindedInvoices } = await supabase
         .from('invoices')
-        .select('id, cfe_id, amount, due, clients(id, name, phone)')
+        .select('id, cfe_id, amount, due, clients(id, name, phone, email)')
         .eq('profile_id', profile.id)
         .in('status', ['reminded', 'ai_negotiating'])
 
@@ -204,7 +225,27 @@ serve(async (req) => {
             status: 'sent',
           })
           await supabase.from('invoices').update({ status: 'ai_negotiating' }).eq('id', inv.id)
-          await sendWhatsApp(client.phone, msg, twilioSid, twilioToken, twilioFrom)
+
+          // WhatsApp
+          if (cfg.channel_whatsapp !== false) {
+            await sendWhatsApp(client.phone, msg, twilioSid, twilioToken, twilioFrom)
+          }
+
+          // Email
+          if (cfg.channel_email !== false && client.email) {
+            await sendEmail({
+              to:      client.email,
+              subject: `Seguimiento de cobro — Factura ${inv.cfe_id}`,
+              html:    reminderEmailHtml({
+                clientName:  client.name,
+                company:     profile.company ?? 'la empresa',
+                cfeId:       inv.cfe_id,
+                amount:      Number(inv.amount),
+                due:         inv.due,
+                messageBody: msg,
+              }),
+            })
+          }
 
           console.log(`✓ Follow-up enviado: factura ${inv.cfe_id} → ${client.name}`)
           stats.sent++

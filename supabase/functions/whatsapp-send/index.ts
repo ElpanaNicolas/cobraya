@@ -1,12 +1,12 @@
 // whatsapp-send
 // El frontend llama a esta función cuando el usuario aprieta
 // "Recordatorio" o "Activar IA" en una factura.
-// Genera el mensaje con Claude, lo envía por Twilio y lo guarda en la DB.
+// Genera el mensaje con Claude, lo envía por WhatsApp y/o email, y lo guarda en la DB.
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { sendWhatsApp } from '../_shared/twilio.ts'
 import { callClaude }   from '../_shared/claude.ts'
+import { sendEmail, reminderEmailHtml } from '../_shared/resend.ts'
 import { corsHeaders, handleCors } from '../_shared/cors.ts'
 
 serve(async (req) => {
@@ -26,17 +26,14 @@ serve(async (req) => {
     const { invoiceId, type } = await req.json()
     if (!invoiceId || !type) return json({ error: 'invoiceId y type son requeridos' }, 400)
 
-    // ── Datos de la factura + cliente ────────────────────────
+    // ── Datos de la factura + cliente (incluye email) ────────
     const { data: invoice, error: invErr } = await supabase
       .from('invoices')
-      .select('*, clients(id, name, phone)')
+      .select('*, clients(id, name, phone, email)')
       .eq('id', invoiceId)
       .eq('profile_id', user.id)
       .single()
     if (invErr || !invoice) return json({ error: 'Factura no encontrada' }, 404)
-
-    const clientPhone = invoice.clients?.phone
-    if (!clientPhone) return json({ error: 'El cliente no tiene teléfono configurado' }, 400)
 
     // ── Config del agente y perfil ───────────────────────────
     const [{ data: agentCfg }, { data: profile }] = await Promise.all([
@@ -49,7 +46,7 @@ serve(async (req) => {
       amigable:    'amigable y cordial',
       firme:       'firme y enfático',
     }
-    const tone = toneMap[agentCfg?.tone ?? 'profesional']
+    const tone  = toneMap[agentCfg?.tone ?? 'profesional']
     const firma = profile?.signature || profile?.company || 'El equipo de cobros'
 
     // ── Prompt según tipo de acción ──────────────────────────
@@ -58,12 +55,9 @@ serve(async (req) => {
       ai:       `Redactá un mensaje inicial para gestionar el cobro de la factura vencida ${invoice.cfe_id} por $${Number(invoice.amount).toLocaleString('es-UY')} UYU (venció el ${invoice.due}). Tono ${tone}. ${agentCfg?.offer_payment_plan ? `Mencioná que hay posibilidad de plan de ${agentCfg.payment_plan_installments} cuotas.` : ''} Máximo 4 oraciones. Firma como: ${firma}`,
     }
 
-    const prompt = prompts[type] ?? prompts.reminder
-
-    // ── Generar con Claude ───────────────────────────────────
     const messageBody = await callClaude(
-      `Sos el asistente de cobros de ${profile?.company ?? 'la empresa'}. Respondé solo con el mensaje de WhatsApp, sin comillas ni comentarios adicionales.`,
-      [{ role: 'user', content: prompt }],
+      `Sos el asistente de cobros de ${profile?.company ?? 'la empresa'}. Respondé solo con el mensaje, sin comillas ni comentarios adicionales.`,
+      [{ role: 'user', content: prompts[type] ?? prompts.reminder }],
       200,
       'claude-haiku-4-5'
     )
@@ -97,32 +91,64 @@ serve(async (req) => {
     const newStatus = type === 'ai' ? 'ai_negotiating' : 'reminded'
     await supabase.from('invoices').update({ status: newStatus }).eq('id', invoiceId)
 
-    // ── Enviar por WhatsApp con las credenciales del negocio ─
-    // Usa las del perfil si las cargó, sino cae a las vars de entorno (testing)
+    const channels = { whatsapp: false, email: false }
+
+    // ── Canal WhatsApp ───────────────────────────────────────
+    const clientPhone = invoice.clients?.phone
     const twilioSid   = profile?.twilio_account_sid || Deno.env.get('TWILIO_ACCOUNT_SID')
     const twilioToken = profile?.twilio_auth_token  || Deno.env.get('TWILIO_AUTH_TOKEN')
     const twilioFrom  = profile?.twilio_wa_number   || Deno.env.get('TWILIO_WHATSAPP_NUMBER')
-    const clientPhone = invoice.clients?.phone
 
-    if (clientPhone && twilioSid && twilioToken && twilioFrom) {
-      await fetch(
-        `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Basic ${btoa(`${twilioSid}:${twilioToken}`)}`,
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: new URLSearchParams({
-            From: `whatsapp:${twilioFrom}`,
-            To:   `whatsapp:${clientPhone}`,
-            Body: messageBody,
-          }),
-        }
-      )
+    if (clientPhone && twilioSid && twilioToken && twilioFrom && agentCfg?.channel_whatsapp !== false) {
+      try {
+        await fetch(
+          `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`,
+          {
+            method: 'POST',
+            headers: {
+              Authorization: `Basic ${btoa(`${twilioSid}:${twilioToken}`)}`,
+              'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams({
+              From: `whatsapp:${twilioFrom}`,
+              To:   `whatsapp:${clientPhone}`,
+              Body: messageBody,
+            }),
+          }
+        )
+        channels.whatsapp = true
+      } catch (err) {
+        console.error('WhatsApp send error:', err)
+      }
     }
 
-    return json({ ok: true, message: messageBody })
+    // ── Canal Email ──────────────────────────────────────────
+    const clientEmail = invoice.clients?.email
+    if (clientEmail && agentCfg?.channel_email !== false) {
+      try {
+        const subject = type === 'ai'
+          ? `Gestión de cobro — Factura ${invoice.cfe_id}`
+          : `Recordatorio de pago — Factura ${invoice.cfe_id}`
+
+        await sendEmail({
+          to:      clientEmail,
+          subject,
+          html:    reminderEmailHtml({
+            clientName:  invoice.clients.name,
+            company:     profile?.company ?? 'la empresa',
+            cfeId:       invoice.cfe_id,
+            amount:      Number(invoice.amount),
+            due:         invoice.due,
+            messageBody,
+          }),
+        })
+        channels.email = true
+      } catch (err) {
+        console.error('Email send error:', err)
+      }
+    }
+
+    return json({ ok: true, message: messageBody, channels })
 
   } catch (err) {
     console.error('whatsapp-send error:', err)
