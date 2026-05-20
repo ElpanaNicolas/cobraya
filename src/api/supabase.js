@@ -20,11 +20,13 @@ export const api = {
       .eq('id', user.id)
       .single()
     check(error)
+    const emailUser = user.email.split('@')[0].replace(/[._-]/g, ' ')
+    const displayName = data.company || emailUser
     return {
-      name:     user.email.split('@')[0],
+      name:     displayName,
       email:    user.email,
       plan:     data.plan,
-      initials: data.company ? data.company.slice(0,2).toUpperCase() : user.email.slice(0,2).toUpperCase(),
+      initials: displayName.slice(0,2).toUpperCase(),
       company:  data.company,
       whatsappNumber: data.whatsapp,
     }
@@ -92,18 +94,28 @@ export const api = {
 
   async getActivity() {
     const { data: { user } } = await supabase.auth.getUser()
+    // Primero traemos las conversaciones del usuario
+    const { data: convs } = await supabase
+      .from('conversations')
+      .select('id, clients(name)')
+      .eq('profile_id', user.id)
+    const convIds = (convs ?? []).map(c => c.id)
+    if (!convIds.length) return []
+
+    const convMap = Object.fromEntries((convs ?? []).map(c => [c.id, c.clients?.name ?? '']))
+
     const { data, error } = await supabase
       .from('messages')
-      .select('*, conversations(client_id, clients(name))')
-      .eq('conversations.profile_id', user.id)
+      .select('id, conversation_id, from_role, body, sent_at')
+      .in('conversation_id', convIds)
       .eq('from_role', 'agent')
       .order('sent_at', { ascending: false })
       .limit(10)
     check(error)
-    return (data ?? []).map((m, i) => ({
+    return (data ?? []).map(m => ({
       id:     m.id,
       ts:     m.sent_at,
-      client: m.conversations?.clients?.name ?? '',
+      client: convMap[m.conversation_id] ?? '',
       action: m.body.slice(0, 80),
       type:   'reminder',
       icon:   '📲',
