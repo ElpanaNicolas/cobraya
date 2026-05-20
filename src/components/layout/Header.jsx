@@ -20,23 +20,24 @@ export function Header({ user, onNuevaFactura }) {
   const dateStr  = time.toLocaleDateString('es-UY', { weekday: 'long', day: 'numeric', month: 'long' })
 
   return (
-    <header style={{
+    <header className="app-header" style={{
       height: 'var(--header-h)', padding: '0 24px',
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       borderBottom: '1px solid var(--border)',
-      background: 'rgba(8,8,8,0.85)', backdropFilter: 'blur(12px)',
+      background: 'rgba(8,8,8,0.85)',
+      backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
       position: 'sticky', top: 0, zIndex: 50, flexShrink: 0,
     }}>
       <div>
-        <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700, letterSpacing: '-0.02em' }}>
+        <div className="greeting-name" style={{ fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700, letterSpacing: '-0.02em' }}>
           {greeting}{user ? `, ${user.name.split(' ')[0]}` : ''} 👋
         </div>
-        <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 1, letterSpacing: '.05em' }}>
+        <div className="greeting-date" style={{ fontSize: 10, color: 'var(--muted)', marginTop: 1, letterSpacing: '.05em' }}>
           {dateStr} · {timeStr}
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+      <div className="header-actions" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
         <Button size="sm" onClick={onNuevaFactura}>+ Nueva factura</Button>
 
         {/* AI pulse */}

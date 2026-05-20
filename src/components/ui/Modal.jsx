@@ -10,15 +10,17 @@ export function Modal({ title, onClose, children, width = 480 }) {
   return (
     <div
       onClick={onClose}
+      className="modal-overlay"
       style={{
         position: 'fixed', inset: 0, zIndex: 200,
-        background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
+        background: 'rgba(0,0,0,0.7)',
+        backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)',
         display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24,
       }}
     >
       <div
         onClick={e => e.stopPropagation()}
-        className="fade-up"
+        className="fade-up modal-box"
         style={{
           width: '100%', maxWidth: width,
           background: 'var(--surface)', border: '1px solid var(--border2)',

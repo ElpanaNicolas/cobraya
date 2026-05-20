@@ -14,7 +14,7 @@ export function Sidebar({ user }) {
   const w = open ? 'var(--sidebar-w)' : '60px'
 
   return (
-    <aside style={{
+    <aside className="app-sidebar" style={{
       width: w, minWidth: w, transition: 'width .3s cubic-bezier(.23,1,.32,1)',
       background: 'var(--surface)', borderRight: '1px solid var(--border)',
       display: 'flex', flexDirection: 'column', overflow: 'hidden', flexShrink: 0,

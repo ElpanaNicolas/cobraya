@@ -66,3 +66,51 @@ scrollbar-color: var(--border2) transparent;
 
 /* Utils */
 .truncate { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
+
+/* ── Mobile (≤ 768px) ─────────────────────────────────────── */
+@media (max-width: 768px) {
+  /* Altura real en iOS Safari (excluye barra del browser) */
+  html, body, #root { height: 100dvh; }
+
+  /* webkit prefix para backdrop-filter del header */
+  header { -webkit-backdrop-filter: blur(12px) !important; }
+
+  /* Layout: ocultar sidebar, mostrar todo en columna */
+  .app-layout { flex-direction: column !important; }
+  .app-sidebar { display: none !important; }
+  .app-main   { padding-bottom: 64px !important; } /* espacio para nav bottom */
+
+  /* Bottom nav */
+  .mobile-nav {
+    display: flex !important;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    height: 60px;
+    padding-bottom: env(safe-area-inset-bottom);
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    z-index: 100;
+  }
+
+  /* Header: más compacto */
+  .app-header { padding: 0 16px !important; }
+  .app-header .greeting-date { display: none !important; }
+  .app-header .greeting-name { font-size: 15px !important; }
+  .app-header .header-actions { gap: 6px !important; }
+
+  /* Tablas: scroll horizontal */
+  table { font-size: 11px !important; }
+
+  /* Modales: full screen en mobile */
+  .modal-box {
+    max-width: 100% !important;
+    width: 100% !important;
+    margin: 0 !important;
+    border-radius: 16px 16px 0 0 !important;
+    position: fixed !important;
+    bottom: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+  }
+  .modal-overlay { align-items: flex-end !important; padding: 0 !important; }
+}

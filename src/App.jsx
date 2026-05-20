@@ -5,6 +5,7 @@ import { useApi } from '@/hooks/useApi'
 import { api } from '@/api'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { Header }  from '@/components/layout/Header'
+import { MobileNav } from '@/components/layout/MobileNav'
 import { NuevaFacturaModal } from '@/components/invoices/NuevaFacturaModal'
 import { Dashboard }     from '@/pages/Dashboard'
 import { Facturas }      from '@/pages/Facturas'
@@ -36,9 +37,9 @@ export default function App() {
   if (!session)    return <Login />
 
   return (
-    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
+    <div className="app-layout" style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>
       <Sidebar user={user} />
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <div className="app-main" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <Header user={user} onNuevaFactura={() => setFacturaModal(true)} />
         <main style={{ flex: 1, overflowY: 'auto' }}>
           <Routes>
@@ -50,6 +51,8 @@ export default function App() {
           </Routes>
         </main>
       </div>
+
+      <MobileNav />
 
       {facturaModal && (
         <NuevaFacturaModal
