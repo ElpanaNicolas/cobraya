@@ -16,7 +16,7 @@ const FILTERS = [
 
 const COLS = ['CFE / ID', 'Cliente', 'Monto', 'Vencimiento', 'Canal', 'Estado', '']
 
-export function InvoiceTable({ data, loading, onAction }) {
+export function InvoiceTable({ data, loading, onAction, onDelete }) {
   const [filter, setFilter]   = useState('all')
   const [search, setSearch]   = useState('')
   const [selected, setSelected] = useState(null)
@@ -164,6 +164,7 @@ export function InvoiceTable({ data, loading, onAction }) {
           invoice={selected}
           onClose={() => setSelected(null)}
           onAction={async (action) => { await onAction(action, selected.id); setSelected(null) }}
+          onDelete={async () => { await onDelete(selected.id); setSelected(null) }}
         />
       )}
     </div>

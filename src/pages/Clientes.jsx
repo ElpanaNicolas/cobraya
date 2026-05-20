@@ -36,8 +36,10 @@ function ScoreBar({ score }) {
   )
 }
 
-function ClientRow({ client, expanded, onToggle }) {
-  const [chatTab, setChatTab] = useState(false)
+function ClientRow({ client, expanded, onToggle, onDelete }) {
+  const [chatTab, setChatTab]   = useState(false)
+  const [confirm, setConfirm]   = useState(false)
+  const [deleting, setDeleting] = useState(false)
   return (
     <>
       <tr
@@ -78,9 +80,30 @@ function ClientRow({ client, expanded, onToggle }) {
           {client.invoiceCount}
         </td>
         <td style={{ padding: '13px 16px' }}>
-          <span style={{ fontSize: 10, fontFamily: 'var(--font-ui)', fontWeight: 700, color: expanded ? 'var(--green-l)' : 'var(--muted)' }}>
-            {expanded ? 'Cerrar ↑' : 'Ver →'}
-          </span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 10, fontFamily: 'var(--font-ui)', fontWeight: 700, color: expanded ? 'var(--green-l)' : 'var(--muted)' }}>
+              {expanded ? 'Cerrar ↑' : 'Ver →'}
+            </span>
+            {!confirm ? (
+              <span
+                onClick={e => { e.stopPropagation(); setConfirm(true) }}
+                style={{ fontSize: 10, color: 'var(--muted2)', cursor: 'pointer', fontFamily: 'var(--font-ui)', transition: 'color .15s' }}
+                onMouseEnter={e => e.currentTarget.style.color = 'var(--red)'}
+                onMouseLeave={e => e.currentTarget.style.color = 'var(--muted2)'}
+              >Eliminar</span>
+            ) : (
+              <div style={{ display: 'flex', gap: 4 }} onClick={e => e.stopPropagation()}>
+                <button onClick={async () => { setDeleting(true); await onDelete(client.id); setDeleting(false) }}
+                  style={{ padding: '3px 8px', fontSize: 9, fontFamily: 'var(--font-ui)', fontWeight: 700, cursor: 'pointer', borderRadius: 4, border: '1px solid rgba(224,96,96,0.4)', background: 'rgba(224,96,96,0.12)', color: 'var(--red)' }}>
+                  {deleting ? '…' : 'Confirmar'}
+                </button>
+                <button onClick={() => setConfirm(false)}
+                  style={{ padding: '3px 8px', fontSize: 9, fontFamily: 'var(--font-ui)', fontWeight: 700, cursor: 'pointer', borderRadius: 4, border: '1px solid var(--border2)', background: 'transparent', color: 'var(--muted)' }}>
+                  No
+                </button>
+              </div>
+            )}
+          </div>
         </td>
       </tr>
 
@@ -160,6 +183,12 @@ export function Clientes() {
   const [search, setSearch]     = useState('')
   const [modal, setModal]       = useState(false)
 
+  const handleDelete = async (clientId) => {
+    await api.deleteClient(clientId)
+    setExpanded(null)
+    refetch()
+  }
+
   const filtered = (data ?? []).filter(c =>
     c.name.toLowerCase().includes(search.toLowerCase()) ||
     c.rut.includes(search)
@@ -224,6 +253,7 @@ export function Clientes() {
                     client={c}
                     expanded={expanded === c.id}
                     onToggle={() => setExpanded(expanded === c.id ? null : c.id)}
+                    onDelete={handleDelete}
                   />
                 ))
               )}

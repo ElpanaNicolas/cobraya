@@ -61,6 +61,11 @@ export function Facturas() {
     invoices.refetch()
   }
 
+  const handleDelete = async (invoiceId) => {
+    await api.deleteInvoice(invoiceId)
+    invoices.refetch()
+  }
+
   return (
     <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
@@ -78,6 +83,7 @@ export function Facturas() {
         data={invoices.data}
         loading={invoices.loading}
         onAction={handleAction}
+        onDelete={handleDelete}
       />
     </div>
   )

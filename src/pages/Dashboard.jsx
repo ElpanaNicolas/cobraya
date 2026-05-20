@@ -16,6 +16,13 @@ export function Dashboard() {
     if (action === 'reminder') await api.sendReminder(invoiceId)
     if (action === 'ai')       await api.activateAI(invoiceId)
     invoices.refetch()
+    kpis.refetch()
+  }
+
+  const handleDelete = async (invoiceId) => {
+    await api.deleteInvoice(invoiceId)
+    invoices.refetch()
+    kpis.refetch()
   }
 
   return (
@@ -35,6 +42,7 @@ export function Dashboard() {
         data={invoices.data}
         loading={invoices.loading}
         onAction={handleAction}
+        onDelete={handleDelete}
       />
     </div>
   )
