@@ -14,23 +14,40 @@ const supabase = createClient(
 
 serve(async (req) => {
   // Twilio envía POST con form-data
-  const form  = await req.formData()
-  const from  = (form.get('From') as string) ?? ''   // "whatsapp:+59899123456"
-  const body  = (form.get('Body') as string) ?? ''
+  const form        = await req.formData()
+  const from        = (form.get('From') as string) ?? ''  // "whatsapp:+59899123456" — cliente
+  const to          = (form.get('To')   as string) ?? ''  // "whatsapp:+14155238886" — negocio
+  const body        = (form.get('Body') as string) ?? ''
 
-  const phone = from.replace('whatsapp:', '').trim()
+  const clientPhone   = from.replace('whatsapp:', '').trim()
+  const businessPhone = to.replace('whatsapp:', '').trim()
 
   try {
-    // ── 1. Encontrar el cliente por teléfono ─────────────────
+    // ── 1. Identificar el negocio por su número de WhatsApp ──
+    // Esto permite que un solo webhook sirva a múltiples negocios,
+    // cada uno con su propio número de Twilio.
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('whatsapp', businessPhone)
+      .maybeSingle()
+
+    if (!profile) {
+      console.log(`Número de negocio no registrado: ${businessPhone}`)
+      return twiml('')
+    }
+
+    // ── 2. Encontrar el cliente dentro de ese negocio ────────
     const { data: client } = await supabase
       .from('clients')
       .select('id, name, profile_id')
-      .eq('phone', phone)
+      .eq('phone', clientPhone)
+      .eq('profile_id', profile.id)   // ← scoped al negocio correcto
       .maybeSingle()
 
     if (!client) {
-      console.log(`Número desconocido: ${phone}`)
-      return twiml('')   // silencio — no responder a números no registrados
+      console.log(`Número de cliente desconocido: ${clientPhone} para negocio ${businessPhone}`)
+      return twiml('')
     }
 
     // ── 2. Encontrar o crear la conversación activa ──────────

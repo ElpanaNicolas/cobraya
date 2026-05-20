@@ -23,12 +23,15 @@ export const api = {
     const emailUser = user.email.split('@')[0].replace(/[._-]/g, ' ')
     const displayName = data.company || emailUser
     return {
-      name:     displayName,
-      email:    user.email,
-      plan:     data.plan,
-      initials: displayName.slice(0,2).toUpperCase(),
-      company:  data.company,
-      whatsappNumber: data.whatsapp,
+      name:             displayName,
+      email:            user.email,
+      plan:             data.plan,
+      initials:         displayName.slice(0,2).toUpperCase(),
+      company:          data.company,
+      whatsappNumber:   data.whatsapp,
+      twilioAccountSid: data.twilio_account_sid ?? '',
+      twilioAuthToken:  data.twilio_auth_token  ?? '',
+      twilioWaNumber:   data.twilio_wa_number   ?? '',
     }
   },
 
@@ -378,11 +381,17 @@ export const api = {
     return { ok: true }
   },
 
-  async saveProfile({ company }) {
+  async saveProfile({ company, twilioAccountSid, twilioAuthToken, twilioWaNumber }) {
     const { data: { user } } = await supabase.auth.getUser()
     const { error } = await supabase
       .from('profiles')
-      .update({ company })
+      .update({
+        company,
+        ...(twilioAccountSid !== undefined && { twilio_account_sid: twilioAccountSid }),
+        ...(twilioAuthToken  !== undefined && { twilio_auth_token:  twilioAuthToken  }),
+        ...(twilioWaNumber   !== undefined && { twilio_wa_number:   twilioWaNumber,
+                                               whatsapp:            twilioWaNumber   }),
+      })
       .eq('id', user.id)
     check(error)
     return { ok: true }

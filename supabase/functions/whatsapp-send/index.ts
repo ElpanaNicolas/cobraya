@@ -41,7 +41,7 @@ serve(async (req) => {
     // ── Config del agente y perfil ───────────────────────────
     const [{ data: agentCfg }, { data: profile }] = await Promise.all([
       supabase.from('agent_config').select('*').eq('profile_id', user.id).single(),
-      supabase.from('profiles').select('company, signature').eq('id', user.id).single(),
+      supabase.from('profiles').select('company, signature, twilio_account_sid, twilio_auth_token, twilio_wa_number').eq('id', user.id).single(),
     ])
 
     const toneMap: Record<string, string> = {
@@ -97,8 +97,30 @@ serve(async (req) => {
     const newStatus = type === 'ai' ? 'ai_negotiating' : 'reminded'
     await supabase.from('invoices').update({ status: newStatus }).eq('id', invoiceId)
 
-    // ── Enviar por WhatsApp ──────────────────────────────────
-    await sendWhatsApp(clientPhone, messageBody)
+    // ── Enviar por WhatsApp con las credenciales del negocio ─
+    // Usa las del perfil si las cargó, sino cae a las vars de entorno (testing)
+    const twilioSid   = profile?.twilio_account_sid || Deno.env.get('TWILIO_ACCOUNT_SID')
+    const twilioToken = profile?.twilio_auth_token  || Deno.env.get('TWILIO_AUTH_TOKEN')
+    const twilioFrom  = profile?.twilio_wa_number   || Deno.env.get('TWILIO_WHATSAPP_NUMBER')
+    const clientPhone = invoice.clients?.phone
+
+    if (clientPhone && twilioSid && twilioToken && twilioFrom) {
+      await fetch(
+        `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Basic ${btoa(`${twilioSid}:${twilioToken}`)}`,
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body: new URLSearchParams({
+            From: `whatsapp:${twilioFrom}`,
+            To:   `whatsapp:${clientPhone}`,
+            Body: messageBody,
+          }),
+        }
+      )
+    }
 
     return json({ ok: true, message: messageBody })
 

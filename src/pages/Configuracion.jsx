@@ -95,7 +95,13 @@ export function Configuracion() {
 
   // Inicializar forms cuando llegan los datos
   if (cfg && !form)   setForm({ ...cfg })
-  if (user && !profile) setProfile({ company: user.company ?? '', email: user.email ?? '' })
+  if (user && !profile) setProfile({
+    company:           user.company ?? '',
+    email:             user.email ?? '',
+    twilioAccountSid:  user.twilioAccountSid ?? '',
+    twilioAuthToken:   user.twilioAuthToken ?? '',
+    twilioWaNumber:    user.twilioWaNumber ?? '',
+  })
 
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }))
   const setChannel = (ch, val) => setForm(f => ({ ...f, channels: { ...f.channels, [ch]: val } }))
@@ -234,6 +240,52 @@ export function Configuracion() {
             </div>
             <Toggle value={form.channels.email} onChange={v => setChannel('email', v)} />
           </div>
+        </div>
+      </Section>
+
+      {/* Twilio */}
+      <Section title="Conexión WhatsApp" subtitle="Credenciales de tu cuenta Twilio — cada negocio usa su propio número">
+        <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(91,196,232,0.07)', border: '1px solid rgba(91,196,232,0.2)', marginBottom: 16, fontSize: 11, color: 'var(--muted)', lineHeight: 1.6 }}>
+          <span style={{ color: '#5bc4e8', fontWeight: 700, fontFamily: 'var(--font-ui)' }}>¿Cómo conseguir estas credenciales?</span>
+          {' '}Crear cuenta en{' '}
+          <a href="https://twilio.com" target="_blank" rel="noreferrer" style={{ color: '#5bc4e8' }}>twilio.com</a>
+          {' '}→ Console → Account Info. El número debe tener WhatsApp habilitado.
+        </div>
+        <div className="config-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <Field label="Account SID" hint="Empieza con AC...">
+            <Input
+              value={profile?.twilioAccountSid ?? ''}
+              onChange={e => setProfile(p => ({ ...p, twilioAccountSid: e.target.value }))}
+              placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+            />
+          </Field>
+          <Field label="Auth Token" hint="Se guarda de forma segura">
+            <Input
+              value={profile?.twilioAuthToken ?? ''}
+              onChange={e => setProfile(p => ({ ...p, twilioAuthToken: e.target.value }))}
+              placeholder="••••••••••••••••••••••••••••••••"
+              type="password"
+            />
+          </Field>
+          <Field label="Número de WhatsApp" hint="Con código de país, ej: +59899123456">
+            <Input
+              value={profile?.twilioWaNumber ?? ''}
+              onChange={e => setProfile(p => ({ ...p, twilioWaNumber: e.target.value }))}
+              placeholder="+59899123456"
+            />
+          </Field>
+          <Field label="URL del webhook" hint="Pegá esto en Twilio → Sandbox Settings">
+            <div style={{
+              background: 'var(--surface3)', border: '1px solid var(--border)', borderRadius: 6,
+              padding: '8px 12px', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--muted)',
+              wordBreak: 'break-all', userSelect: 'all', cursor: 'copy',
+            }}
+              onClick={e => { navigator.clipboard.writeText(e.currentTarget.textContent ?? ''); toast.success('URL copiada') }}
+              title="Click para copiar"
+            >
+              {`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-inbound`}
+            </div>
+          </Field>
         </div>
       </Section>
 
