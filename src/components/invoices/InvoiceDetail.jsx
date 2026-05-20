@@ -74,7 +74,7 @@ export function InvoiceDetail({ invoice: inv, onClose, onAction, onDelete }) {
 
       {/* Tab: Detalle */}
       {tab === 'detalle' && (
-        <div style={{ padding: '20px 24px', display: 'grid', gridTemplateColumns: '1.5fr 1fr 1.5fr', gap: 24, alignItems: 'start' }}>
+        <div className="detail-grid" style={{ padding: '20px 24px', display: 'grid', gridTemplateColumns: '1.5fr 1fr 1.5fr', gap: 24, alignItems: 'start' }}>
           <div>
             <div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--muted)', marginBottom: 6 }}>Cliente</div>
             <div style={{ fontFamily: 'var(--font-ui)', fontWeight: 700, fontSize: 15 }}>{inv.client}</div>

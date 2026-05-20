@@ -39,13 +39,13 @@ export function Dashboard() {
   }
 
   return (
-    <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="page-pad" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
 
       {/* KPIs */}
       <KPICards data={kpis.data} loading={kpis.loading} />
 
       {/* Chart + Feed */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 16 }}>
+      <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 16 }}>
         <TrendChart data={chart.data} loading={chart.loading} />
         <ActivityFeed data={activity.data} loading={activity.loading} />
       </div>

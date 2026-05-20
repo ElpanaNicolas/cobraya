@@ -82,7 +82,7 @@ export function InvoiceTable({ data, loading, onAction, onDelete }) {
     <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
 
       {/* Controls */}
-      <div style={{
+      <div className="invoice-controls" style={{
         padding: '13px 18px', borderBottom: '1px solid var(--border)',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap',
       }}>
@@ -110,7 +110,7 @@ export function InvoiceTable({ data, loading, onAction, onDelete }) {
           )}
         </div>
 
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div className="invoice-filter-row" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           {/* Search */}
           <div style={{ position: 'relative' }}>
             <span style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', fontSize: 12, color: 'var(--muted)', pointerEvents: 'none' }}>⌕</span>
@@ -124,7 +124,7 @@ export function InvoiceTable({ data, loading, onAction, onDelete }) {
           </div>
 
           {/* Date pills */}
-          <div style={{ display: 'flex', gap: 4 }}>
+          <div className="invoice-pills" style={{ display: 'flex', gap: 4 }}>
             {DATE_FILTERS.map(f => {
               const active = dateFilter === f.id
               return (
@@ -141,7 +141,7 @@ export function InvoiceTable({ data, loading, onAction, onDelete }) {
           </div>
 
           {/* Status pills */}
-          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+          <div className="invoice-pills" style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
             {FILTERS.map(f => {
               const cfg = STATUS[f.id]
               const active = filter === f.id

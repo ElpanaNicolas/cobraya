@@ -113,4 +113,52 @@ scrollbar-color: var(--border2) transparent;
     right: 0 !important;
   }
   .modal-overlay { align-items: flex-end !important; padding: 0 !important; }
+
+  /* Padding de páginas: 24→16px */
+  .page-pad { padding: 16px !important; gap: 12px !important; }
+
+  /* Dashboard: 2 cols → 1 col */
+  .dashboard-grid { grid-template-columns: 1fr !important; }
+
+  /* StatBar: 5 cards → scroll horizontal */
+  .stat-bar {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding-bottom: 6px !important;
+    gap: 8px !important;
+  }
+  .stat-bar > * { min-width: 130px !important; flex-shrink: 0 !important; }
+
+  /* InvoiceTable controls: apilan verticalmente */
+  .invoice-controls {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 8px !important;
+  }
+  .invoice-filter-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+    gap: 6px !important;
+  }
+  .invoice-filter-row > div:first-child { width: 100% !important; }
+  .invoice-filter-row > div:first-child input { width: 100% !important; }
+  /* Pills: scroll horizontal sin wrap */
+  .invoice-pills {
+    flex-wrap: nowrap !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    padding-bottom: 2px !important;
+  }
+
+  /* InvoiceDetail: 3 cols → 1 col */
+  .detail-grid { grid-template-columns: 1fr !important; gap: 16px !important; padding: 16px !important; }
+
+  /* Configuración: grids responsivos */
+  .config-grid-2 { grid-template-columns: 1fr !important; }
+  .config-grid-3 { grid-template-columns: 1fr 1fr !important; }
+
+  /* Agente IA: panels full-width, toggle entre lista y chat */
+  .agente-sidebar { width: 100% !important; border-right: none !important; }
+  .agente-sidebar--hidden { display: none !important; }
+  .agente-back-btn { display: flex !important; }
 }

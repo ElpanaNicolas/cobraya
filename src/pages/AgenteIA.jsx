@@ -80,7 +80,7 @@ function ConvItem({ conv, active, onClick }) {
   )
 }
 
-function ChatPanel({ conv }) {
+function ChatPanel({ conv, onBack }) {
   if (!conv) {
     return (
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10, color: 'var(--muted)' }}>
@@ -101,6 +101,12 @@ function ChatPanel({ conv }) {
         background: 'rgba(37,211,102,0.05)',
         display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0,
       }}>
+        {onBack && (
+          <button onClick={onBack} className="agente-back-btn" style={{
+            display: 'none', background: 'none', border: 'none',
+            color: 'var(--green-l)', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: '4px 2px',
+          }}>‹</button>
+        )}
         <div style={{
           width: 36, height: 36, borderRadius: '50%',
           background: 'rgba(37,211,102,0.15)',
@@ -193,7 +199,7 @@ export function AgenteIA() {
   return (
     <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
       {/* Sidebar — lista de conversaciones */}
-      <div style={{
+      <div className={`agente-sidebar${selected ? ' agente-sidebar--hidden' : ''}`} style={{
         width: 300, flexShrink: 0,
         borderRight: '1px solid var(--border)',
         display: 'flex', flexDirection: 'column',
@@ -264,7 +270,7 @@ export function AgenteIA() {
       </div>
 
       {/* Chat panel */}
-      <ChatPanel conv={activeConv} />
+      <ChatPanel conv={activeConv} onBack={selected ? () => setSelected(null) : null} />
     </div>
   )
 }

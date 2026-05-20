@@ -127,7 +127,7 @@ export function Configuracion() {
   }
 
   return (
-    <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 760 }}>
+    <div className="page-pad" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 20, maxWidth: 760 }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
         <div>
           <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, letterSpacing: '-0.02em' }}>Configuración</div>
@@ -140,7 +140,7 @@ export function Configuracion() {
 
       {/* Empresa */}
       <Section title="Empresa" subtitle="Datos que el agente usa al comunicarse con clientes">
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div className="config-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           <Field label="Nombre de empresa">
             <Input value={profile.company} onChange={e => setProfile(p => ({ ...p, company: e.target.value }))} placeholder="García & Asociados" />
           </Field>
@@ -178,7 +178,7 @@ export function Configuracion() {
           </div>
         </Field>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
+        <div className="config-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
           <Field label="Primer recordatorio" hint="Días antes del vencimiento">
             <NumberInput value={form.firstReminderDays} onChange={e => set('firstReminderDays', +e.target.value)} min={1} max={30} />
           </Field>

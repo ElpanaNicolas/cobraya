@@ -27,7 +27,7 @@ function StatBar({ data, loading }) {
   }
 
   return (
-    <div style={{ display: 'flex', gap: 12 }}>
+    <div className="stat-bar" style={{ display: 'flex', gap: 12 }}>
       {STAT_ORDER.map(s => {
         const cfg = STATUS[s]
         return (
@@ -80,7 +80,7 @@ export function Facturas() {
   }
 
   return (
-    <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div className="page-pad" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
         <div>
           <div style={{ fontFamily: 'var(--font-display)', fontSize: 22, letterSpacing: '-0.02em' }}>Facturas</div>
