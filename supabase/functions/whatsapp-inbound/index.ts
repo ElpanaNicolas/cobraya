@@ -4,7 +4,6 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { sendWhatsApp } from '../_shared/twilio.ts'
 import { callClaude }   from '../_shared/claude.ts'
 
 const supabase = createClient(
@@ -12,12 +11,42 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 )
 
+// Envía un WhatsApp usando las credenciales específicas del negocio.
+async function sendReply(to: string, body: string, sid: string, token: string, from: string) {
+  const toFormatted   = to.startsWith('whatsapp:') ? to : `whatsapp:${to}`
+  const fromFormatted = from.startsWith('whatsapp:') ? from : `whatsapp:${from}`
+  const res = await fetch(
+    `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Basic ${btoa(`${sid}:${token}`)}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: new URLSearchParams({ From: fromFormatted, To: toFormatted, Body: body }),
+    }
+  )
+  const data = await res.json()
+  if (!res.ok) throw new Error(`Twilio error: ${data.message}`)
+  return data
+}
+
 serve(async (req) => {
   // Twilio envía POST con form-data
-  const form        = await req.formData()
-  const from        = (form.get('From') as string) ?? ''  // "whatsapp:+59899123456" — cliente
-  const to          = (form.get('To')   as string) ?? ''  // "whatsapp:+14155238886" — negocio
-  const body        = (form.get('Body') as string) ?? ''
+  const rawBody     = await req.text()
+  const form        = new URLSearchParams(rawBody)
+  const from        = form.get('From') ?? ''   // "whatsapp:+59899123456" — cliente
+  const to          = form.get('To')   ?? ''   // "whatsapp:+14155238886" — negocio
+  const body        = form.get('Body') ?? ''
+
+  // Protección básica: verificar token secreto en query string
+  // La URL del webhook debe incluir ?token=WEBHOOK_SECRET
+  const url           = new URL(req.url)
+  const webhookSecret = Deno.env.get('WEBHOOK_SECRET')
+  if (webhookSecret && url.searchParams.get('token') !== webhookSecret) {
+    console.warn('Token de webhook inválido — request rechazado')
+    return twiml('')
+  }
 
   const clientPhone   = from.replace('whatsapp:', '').trim()
   const businessPhone = to.replace('whatsapp:', '').trim()
@@ -29,7 +58,7 @@ serve(async (req) => {
     const { data: profile } = await supabase
       .from('profiles')
       .select('id')
-      .eq('whatsapp', businessPhone)
+      .eq('twilio_wa_number', businessPhone)
       .maybeSingle()
 
     if (!profile) {
@@ -95,9 +124,9 @@ serve(async (req) => {
       .limit(20)
 
     // ── 5. Configuración del agente y perfil ─────────────────
-    const [{ data: agentCfg }, { data: profile }, { data: invoice }] = await Promise.all([
+    const [{ data: agentCfg }, { data: profileData }, { data: invoice }] = await Promise.all([
       supabase.from('agent_config').select('*').eq('profile_id', client.profile_id).single(),
-      supabase.from('profiles').select('company, signature').eq('id', client.profile_id).single(),
+      supabase.from('profiles').select('company, signature, twilio_account_sid, twilio_auth_token, twilio_wa_number').eq('id', client.profile_id).single(),
       conv.invoice_id
         ? supabase.from('invoices').select('cfe_id, amount, due, status').eq('id', conv.invoice_id).single()
         : Promise.resolve({ data: null }),
@@ -110,7 +139,7 @@ serve(async (req) => {
     }
 
     const systemPrompt = [
-      `Sos el asistente de cobros de ${profile?.company ?? 'la empresa'}.`,
+      `Sos el asistente de cobros de ${profileData?.company ?? 'la empresa'}.`,
       `Comunicación: ${toneMap[agentCfg?.tone ?? 'profesional']}.`,
       invoice
         ? `Factura en gestión: ${invoice.cfe_id} por $${Number(invoice.amount).toLocaleString('es-UY')} UYU, vencimiento ${invoice.due}. Estado: ${invoice.status}.`
@@ -119,7 +148,7 @@ serve(async (req) => {
         ? `Si el cliente tiene dificultades, podés ofrecer un plan de ${agentCfg.payment_plan_installments} cuotas mensuales sin interés.`
         : '',
       `Respondé siempre en español rioplatense. Máximo 3 párrafos cortos. Sin emojis excesivos.`,
-      `Firma: ${profile?.signature || profile?.company || 'El equipo de cobros'}`,
+      `Firma: ${profileData?.signature || profileData?.company || 'El equipo de cobros'}`,
     ].filter(Boolean).join(' ')
 
     const claudeMessages = (history ?? []).map(m => ({
@@ -138,8 +167,12 @@ serve(async (req) => {
       status:          'sent',
     })
 
-    // ── 8. Enviar por WhatsApp vía Twilio ────────────────────
-    await sendWhatsApp(from, reply)
+    // ── 8. Enviar por WhatsApp con las credenciales del negocio ─
+    // Usa las del perfil; si no las cargó, cae a los secrets de entorno (dev/testing)
+    const twilioSid   = profileData?.twilio_account_sid || Deno.env.get('TWILIO_ACCOUNT_SID')!
+    const twilioToken = profileData?.twilio_auth_token  || Deno.env.get('TWILIO_AUTH_TOKEN')!
+    const twilioFrom  = profileData?.twilio_wa_number   || Deno.env.get('TWILIO_WHATSAPP_NUMBER')!
+    await sendReply(from, reply, twilioSid, twilioToken, twilioFrom)
 
     return twiml('')   // respuesta vacía (ya enviamos con la API REST)
 

@@ -383,14 +383,15 @@ export const api = {
 
   async saveProfile({ company, twilioAccountSid, twilioAuthToken, twilioWaNumber }) {
     const { data: { user } } = await supabase.auth.getUser()
+    // .trim() evita que espacios o saltos de línea corrompan las credenciales
     const { error } = await supabase
       .from('profiles')
       .update({
         company,
-        ...(twilioAccountSid !== undefined && { twilio_account_sid: twilioAccountSid }),
-        ...(twilioAuthToken  !== undefined && { twilio_auth_token:  twilioAuthToken  }),
-        ...(twilioWaNumber   !== undefined && { twilio_wa_number:   twilioWaNumber,
-                                               whatsapp:            twilioWaNumber   }),
+        ...(twilioAccountSid !== undefined && { twilio_account_sid: twilioAccountSid.trim() }),
+        ...(twilioAuthToken  !== undefined && { twilio_auth_token:  twilioAuthToken.trim()  }),
+        ...(twilioWaNumber   !== undefined && { twilio_wa_number:   twilioWaNumber.trim(),
+                                               whatsapp:            twilioWaNumber.trim()   }),
       })
       .eq('id', user.id)
     check(error)
