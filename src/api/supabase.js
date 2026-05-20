@@ -188,6 +188,7 @@ export const api = {
     check(error)
 
     const shape = (conv) => ({
+      id:            conv.id,
       clientId:      conv.client_id,
       client:        conv.clients?.name ?? '',
       phone:         conv.clients?.phone ?? '',
@@ -336,6 +337,19 @@ export const api = {
 
   async deleteInvoice(invoiceId) {
     const { error } = await supabase.from('invoices').delete().eq('id', invoiceId)
+    check(error)
+    return { ok: true }
+  },
+
+  async sendMessage(conversationId, body) {
+    const { error } = await supabase
+      .from('messages')
+      .insert({
+        conversation_id: conversationId,
+        from_role:       'agent',
+        body,
+        status:          'sent',
+      })
     check(error)
     return { ok: true }
   },

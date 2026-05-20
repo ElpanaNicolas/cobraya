@@ -1,7 +1,8 @@
 import { useApi } from '@/hooks/useApi'
 import { api } from '@/api'
 import { Skeleton } from '@/components/ui/Skeleton'
-import { useCallback } from 'react'
+import { toast } from '@/components/ui/Toast'
+import { useCallback, useState, useRef, useEffect } from 'react'
 
 const STATUS_ICON = { sent: '✓', delivered: '✓✓', read: '✓✓' }
 
@@ -27,9 +28,36 @@ function groupByDay(messages) {
   return groups
 }
 
-export function ChatView({ clientId, invoiceId }) {
+export function ChatView({ clientId }) {
   const fetcher = useCallback(() => api.getConversations(clientId), [clientId])
-  const { data: conv, loading } = useApi(fetcher)
+  const { data: conv, loading, refetch } = useApi(fetcher)
+  const [text, setText]       = useState('')
+  const [sending, setSending] = useState(false)
+  const bottomRef             = useRef(null)
+
+  // Auto-scroll al último mensaje
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [conv?.messages?.length])
+
+  const handleSend = async () => {
+    const msg = text.trim()
+    if (!msg || !conv?.id || sending) return
+    setText('')
+    setSending(true)
+    try {
+      await api.sendMessage(conv.id, msg)
+      refetch()
+    } catch {
+      toast.error('Error al enviar el mensaje')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const handleKey = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() }
+  }
 
   if (loading) {
     return (
@@ -58,8 +86,8 @@ export function ChatView({ clientId, invoiceId }) {
   const items = groupByDay(conv.messages)
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Header WhatsApp */}
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+      {/* Header */}
       <div style={{
         padding: '10px 16px',
         background: 'rgba(37,211,102,0.06)',
@@ -69,8 +97,7 @@ export function ChatView({ clientId, invoiceId }) {
         <div style={{
           width: 32, height: 32, borderRadius: '50%',
           background: 'rgba(37,211,102,0.18)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 15,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15,
         }}>📲</div>
         <div>
           <div style={{ fontFamily: 'var(--font-ui)', fontWeight: 700, fontSize: 12 }}>{conv.client}</div>
@@ -83,10 +110,10 @@ export function ChatView({ clientId, invoiceId }) {
 
       {/* Messages */}
       <div style={{
-        flex: 1, overflowY: 'auto', padding: '16px 20px',
+        overflowY: 'auto', padding: '16px 20px',
         display: 'flex', flexDirection: 'column', gap: 4,
         background: 'rgba(0,0,0,0.15)',
-        maxHeight: 360,
+        maxHeight: 320,
       }}>
         {items.map((item, i) => {
           if (item.type === 'day') {
@@ -100,21 +127,14 @@ export function ChatView({ clientId, invoiceId }) {
               </div>
             )
           }
-
           const isAgent = item.from === 'agent'
           return (
-            <div key={item.id} style={{
-              display: 'flex',
-              justifyContent: isAgent ? 'flex-end' : 'flex-start',
-              marginBottom: 2,
-            }}>
+            <div key={item.id} style={{ display: 'flex', justifyContent: isAgent ? 'flex-end' : 'flex-start', marginBottom: 2 }}>
               <div style={{
-                maxWidth: '72%',
-                padding: '8px 12px',
+                maxWidth: '72%', padding: '8px 12px',
                 borderRadius: isAgent ? '12px 12px 2px 12px' : '12px 12px 12px 2px',
                 background: isAgent ? 'rgba(37,211,102,0.15)' : 'var(--surface2)',
                 border: `1px solid ${isAgent ? 'rgba(37,211,102,0.25)' : 'var(--border)'}`,
-                position: 'relative',
               }}>
                 {isAgent && (
                   <div style={{ fontSize: 9, color: 'rgba(37,211,102,0.8)', fontFamily: 'var(--font-ui)', fontWeight: 700, marginBottom: 3 }}>
@@ -125,28 +145,50 @@ export function ChatView({ clientId, invoiceId }) {
                 <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: 4, marginTop: 4 }}>
                   <span style={{ fontSize: 9, color: 'var(--muted2)' }}>{fmtTime(item.ts)}</span>
                   {isAgent && (
-                    <span style={{
-                      fontSize: 9,
-                      color: item.status === 'read' ? '#53bdeb' : 'var(--muted2)',
-                    }}>{STATUS_ICON[item.status] ?? '✓'}</span>
+                    <span style={{ fontSize: 9, color: item.status === 'read' ? '#53bdeb' : 'var(--muted2)' }}>
+                      {STATUS_ICON[item.status] ?? '✓'}
+                    </span>
                   )}
                 </div>
               </div>
             </div>
           )
         })}
+        <div ref={bottomRef} />
       </div>
 
-      {/* Footer info */}
+      {/* Input */}
       <div style={{
-        padding: '8px 16px',
-        borderTop: '1px solid var(--border)',
-        background: 'var(--surface)',
-        fontSize: 10, color: 'var(--muted2)',
-        display: 'flex', alignItems: 'center', gap: 6,
+        padding: '10px 14px', borderTop: '1px solid var(--border)',
+        background: 'var(--surface)', display: 'flex', gap: 8, alignItems: 'flex-end',
       }}>
-        <span style={{ fontSize: 12 }}>🔒</span>
-        Los mensajes son enviados desde tu número de WhatsApp registrado
+        <textarea
+          value={text}
+          onChange={e => setText(e.target.value)}
+          onKeyDown={handleKey}
+          placeholder="Escribir mensaje… (Enter para enviar)"
+          rows={1}
+          style={{
+            flex: 1, resize: 'none', background: 'var(--surface2)',
+            border: '1px solid var(--border2)', borderRadius: 20,
+            padding: '8px 14px', color: 'var(--white)',
+            fontSize: 12, fontFamily: 'var(--font-mono)',
+            outline: 'none', lineHeight: 1.4, maxHeight: 80, overflowY: 'auto',
+          }}
+        />
+        <button
+          onClick={handleSend}
+          disabled={!text.trim() || sending}
+          style={{
+            width: 36, height: 36, borderRadius: '50%', flexShrink: 0,
+            background: text.trim() ? 'var(--green-l)' : 'var(--surface3)',
+            border: 'none', cursor: text.trim() ? 'pointer' : 'default',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 14, transition: 'background .15s', color: 'var(--white)',
+          }}
+        >
+          {sending ? '…' : '➤'}
+        </button>
       </div>
     </div>
   )
