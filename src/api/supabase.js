@@ -293,20 +293,32 @@ export const api = {
   },
 
   async sendReminder(invoiceId) {
-    const { error } = await supabase
-      .from('invoices')
-      .update({ status: 'reminded' })
-      .eq('id', invoiceId)
-    check(error)
+    // Intenta enviar WA real via Edge Function; si no está deployada, actualiza solo el estado
+    try {
+      const { error } = await supabase.functions.invoke('whatsapp-send', {
+        body: { invoiceId, type: 'reminder' },
+      })
+      if (error) throw error
+    } catch {
+      // Fallback: solo actualizar estado (sin WA real)
+      const { error } = await supabase.from('invoices').update({ status: 'reminded' }).eq('id', invoiceId)
+      check(error)
+    }
     return { ok: true }
   },
 
   async activateAI(invoiceId) {
-    const { error } = await supabase
-      .from('invoices')
-      .update({ status: 'ai_negotiating' })
-      .eq('id', invoiceId)
-    check(error)
+    // Intenta activar agente real via Edge Function; si no está deployada, actualiza solo el estado
+    try {
+      const { error } = await supabase.functions.invoke('whatsapp-send', {
+        body: { invoiceId, type: 'ai' },
+      })
+      if (error) throw error
+    } catch {
+      // Fallback: solo actualizar estado (sin WA real)
+      const { error } = await supabase.from('invoices').update({ status: 'ai_negotiating' }).eq('id', invoiceId)
+      check(error)
+    }
     return { ok: true }
   },
 
