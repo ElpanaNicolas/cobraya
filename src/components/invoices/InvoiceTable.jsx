@@ -14,18 +14,68 @@ const FILTERS = [
   { id: 'paid',          label: 'Pagadas'      },
 ]
 
+const DATE_FILTERS = [
+  { id: 'all',    label: 'Todo'           },
+  { id: 'month',  label: 'Este mes'       },
+  { id: 'prev',   label: 'Mes anterior'   },
+  { id: '3months',label: 'Últimos 3 meses'},
+]
+
+function matchesDateFilter(inv, dateFilter) {
+  if (dateFilter === 'all') return true
+  const d = new Date(inv.issued)
+  const now = new Date()
+  if (dateFilter === 'month') {
+    return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
+  }
+  if (dateFilter === 'prev') {
+    const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+    return d.getFullYear() === prev.getFullYear() && d.getMonth() === prev.getMonth()
+  }
+  if (dateFilter === '3months') {
+    const cutoff = new Date(now); cutoff.setMonth(cutoff.getMonth() - 3)
+    return d >= cutoff
+  }
+  return true
+}
+
 const COLS = ['CFE / ID', 'Cliente', 'Monto', 'Vencimiento', 'Canal', 'Estado', '']
 
+function exportCsv(rows) {
+  const headers = ['CFE/ID', 'Cliente', 'RUT', 'Monto (UYU)', 'Emisión', 'Vencimiento', 'Canal', 'Estado']
+  const statusLabel = { paid: 'Pagada', pending: 'Pendiente', reminded: 'Recordatorio', ai_negotiating: 'IA negociando', overdue: 'Vencida' }
+  const lines = [
+    headers.join(';'),
+    ...rows.map(inv => [
+      inv.cfeId ?? inv.id,
+      inv.client,
+      inv.rut ?? '',
+      inv.amount,
+      inv.issued ?? '',
+      inv.due ?? '',
+      inv.channel ?? '',
+      statusLabel[inv.status] ?? inv.status,
+    ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(';')),
+  ]
+  const blob = new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' })
+  const url  = URL.createObjectURL(blob)
+  const a    = Object.assign(document.createElement('a'), { href: url, download: `cobraya-facturas-${new Date().toISOString().slice(0,10)}.csv` })
+  document.body.appendChild(a); a.click(); document.body.removeChild(a)
+  URL.revokeObjectURL(url)
+}
+
 export function InvoiceTable({ data, loading, onAction, onDelete }) {
-  const [filter, setFilter]   = useState('all')
-  const [search, setSearch]   = useState('')
-  const [selected, setSelected] = useState(null)
+  const [filter, setFilter]       = useState('all')
+  const [dateFilter, setDateFilter] = useState('all')
+  const [search, setSearch]       = useState('')
+  const [selected, setSelected]   = useState(null)
 
   const filtered = (data ?? []).filter(inv => {
     const matchStatus = filter === 'all' || inv.status === filter
+    const matchDate   = matchesDateFilter(inv, dateFilter)
     const q = search.toLowerCase()
     const matchSearch = inv.client.toLowerCase().includes(q) || (inv.cfeId ?? inv.id).toLowerCase().includes(q)
-    return matchStatus && matchSearch
+    return matchStatus && matchDate && matchSearch
   })
 
   return (
@@ -36,9 +86,28 @@ export function InvoiceTable({ data, loading, onAction, onDelete }) {
         padding: '13px 18px', borderBottom: '1px solid var(--border)',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap',
       }}>
-        <div style={{ fontFamily: 'var(--font-ui)', fontWeight: 700, fontSize: 13 }}>
-          Facturas
-          {data && <span style={{ marginLeft: 7, fontSize: 10, color: 'var(--muted)', fontWeight: 400 }}>{filtered.length} / {data.length}</span>}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ fontFamily: 'var(--font-ui)', fontWeight: 700, fontSize: 13 }}>
+            Facturas
+            {data && <span style={{ marginLeft: 7, fontSize: 10, color: 'var(--muted)', fontWeight: 400 }}>{filtered.length} / {data.length}</span>}
+          </div>
+          {filtered.length > 0 && (
+            <button
+              onClick={() => exportCsv(filtered)}
+              title="Exportar CSV"
+              style={{
+                display: 'flex', alignItems: 'center', gap: 5,
+                padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
+                background: 'transparent', border: '1px solid var(--border2)',
+                color: 'var(--muted)', fontSize: 10, fontFamily: 'var(--font-ui)', fontWeight: 700,
+                transition: 'all .15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(45,158,95,0.5)'; e.currentTarget.style.color = 'var(--green-l)' }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border2)'; e.currentTarget.style.color = 'var(--muted)' }}
+            >
+              ↓ CSV
+            </button>
+          )}
         </div>
 
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -52,6 +121,23 @@ export function InvoiceTable({ data, loading, onAction, onDelete }) {
                 color: 'var(--white)', fontSize: 11, fontFamily: 'var(--font-mono)',
                 outline: 'none', width: 190,
               }} />
+          </div>
+
+          {/* Date pills */}
+          <div style={{ display: 'flex', gap: 4 }}>
+            {DATE_FILTERS.map(f => {
+              const active = dateFilter === f.id
+              return (
+                <button key={f.id} onClick={() => setDateFilter(f.id)} style={{
+                  padding: '4px 10px', borderRadius: 100, fontSize: 10,
+                  fontFamily: 'var(--font-ui)', fontWeight: 700, letterSpacing: '.05em',
+                  cursor: 'pointer', transition: 'all .14s', whiteSpace: 'nowrap',
+                  border: `1px solid ${active ? 'rgba(91,196,232,0.4)' : 'var(--border)'}`,
+                  background: active ? 'rgba(91,196,232,0.1)' : 'transparent',
+                  color: active ? '#5bc4e8' : 'var(--muted)',
+                }}>{f.label}</button>
+              )
+            })}
           </div>
 
           {/* Status pills */}
@@ -93,7 +179,7 @@ export function InvoiceTable({ data, loading, onAction, onDelete }) {
                   ))}
                 </tr>
               ))
-            ) : filtered.length === 0 && !search && filter === 'all' ? (
+            ) : filtered.length === 0 && !search && filter === 'all' && dateFilter === 'all' ? (
               <tr>
                 <td colSpan={7}>
                   <div style={{ padding: '56px 24px', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12 }}>

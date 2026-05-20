@@ -3,6 +3,7 @@ import { api } from '@/api'
 import { useApi } from '@/hooks/useApi'
 import { Button } from '@/components/ui/Button'
 import { Skeleton } from '@/components/ui/Skeleton'
+import { toast } from '@/components/ui/Toast'
 
 function Section({ title, subtitle, children }) {
   return (
@@ -101,13 +102,19 @@ export function Configuracion() {
 
   const handleSave = async () => {
     setSaving(true)
-    await Promise.all([
-      api.saveAgentConfig({ ...form, signature: `${profile?.company ?? ''} | ${form.whatsappNumber}` }),
-      api.saveProfile(profile),
-    ])
-    setSaving(false)
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2500)
+    try {
+      await Promise.all([
+        api.saveAgentConfig({ ...form, signature: `${profile?.company ?? ''} | ${form.whatsappNumber}` }),
+        api.saveProfile(profile),
+      ])
+      setSaved(true)
+      setTimeout(() => setSaved(false), 2500)
+      toast.success('Configuración guardada')
+    } catch {
+      toast.error('Error al guardar los cambios')
+    } finally {
+      setSaving(false)
+    }
   }
 
   if (loading || !form || !profile) {

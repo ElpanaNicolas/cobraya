@@ -3,6 +3,7 @@ import { useApi } from '@/hooks/useApi'
 import { fmt, STATUS } from '@/lib/utils'
 import { InvoiceTable } from '@/components/invoices/InvoiceTable'
 import { Skeleton } from '@/components/ui/Skeleton'
+import { toast } from '@/components/ui/Toast'
 
 const STAT_ORDER = ['pending', 'reminded', 'ai_negotiating', 'overdue', 'paid']
 
@@ -55,15 +56,27 @@ export function Facturas() {
   const invoices = useApi(api.getInvoices)
 
   const handleAction = async (action, invoiceId) => {
-    if (action === 'paid')     await api.markPaid(invoiceId)
-    if (action === 'reminder') await api.sendReminder(invoiceId)
-    if (action === 'ai')       await api.activateAI(invoiceId)
-    invoices.refetch()
+    try {
+      if (action === 'paid')     await api.markPaid(invoiceId)
+      if (action === 'reminder') await api.sendReminder(invoiceId)
+      if (action === 'ai')       await api.activateAI(invoiceId)
+      invoices.refetch()
+      if (action === 'paid')     toast.success('Factura marcada como pagada')
+      if (action === 'reminder') toast.success('Recordatorio enviado')
+      if (action === 'ai')       toast.success('Agente IA activado')
+    } catch {
+      toast.error('Error al procesar la acción')
+    }
   }
 
   const handleDelete = async (invoiceId) => {
-    await api.deleteInvoice(invoiceId)
-    invoices.refetch()
+    try {
+      await api.deleteInvoice(invoiceId)
+      invoices.refetch()
+      toast.success('Factura eliminada')
+    } catch {
+      toast.error('Error al eliminar la factura')
+    }
   }
 
   return (

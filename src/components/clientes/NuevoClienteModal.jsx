@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { api } from '@/api'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
+import { toast } from '@/components/ui/Toast'
 
 const EMPTY = { name: '', rut: '', phone: '', email: '' }
 
@@ -44,6 +45,7 @@ export function NuevoClienteModal({ onClose, onCreated }) {
     setError(null)
     try {
       const client = await api.createClient(form)
+      toast.success('Cliente creado correctamente')
       onCreated(client)
       onClose()
     } catch (err) {

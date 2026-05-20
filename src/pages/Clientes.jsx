@@ -6,6 +6,7 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { Button } from '@/components/ui/Button'
 import { ChatView } from '@/components/invoices/ChatView'
 import { NuevoClienteModal } from '@/components/clientes/NuevoClienteModal'
+import { toast } from '@/components/ui/Toast'
 
 function riskLabel(score) {
   if (score >= 85) return { label: 'Bajo riesgo',  color: '#4caf7d', bg: 'rgba(76,175,125,0.12)',  border: 'rgba(76,175,125,0.3)'  }
@@ -184,9 +185,14 @@ export function Clientes() {
   const [modal, setModal]       = useState(false)
 
   const handleDelete = async (clientId) => {
-    await api.deleteClient(clientId)
-    setExpanded(null)
-    refetch()
+    try {
+      await api.deleteClient(clientId)
+      setExpanded(null)
+      refetch()
+      toast.success('Cliente eliminado')
+    } catch {
+      toast.error('Error al eliminar el cliente')
+    }
   }
 
   const filtered = (data ?? []).filter(c =>

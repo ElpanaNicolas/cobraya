@@ -4,6 +4,7 @@ import { useApi } from '@/hooks/useApi'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { NuevoClienteModal } from '@/components/clientes/NuevoClienteModal'
+import { toast } from '@/components/ui/Toast'
 
 function Field({ label, required, children }) {
   return (
@@ -78,6 +79,7 @@ export function NuevaFacturaModal({ onClose, onCreated }) {
         due:      form.due,
         channel:  form.channel || null,
       })
+      toast.success('Factura creada correctamente')
       onCreated(inv)
       onClose()
     } catch (err) {

@@ -7,6 +7,7 @@ import { Sidebar } from '@/components/layout/Sidebar'
 import { Header }  from '@/components/layout/Header'
 import { MobileNav } from '@/components/layout/MobileNav'
 import { NuevaFacturaModal } from '@/components/invoices/NuevaFacturaModal'
+import { Toaster } from '@/components/ui/Toast'
 import { Dashboard }     from '@/pages/Dashboard'
 import { Facturas }      from '@/pages/Facturas'
 import { Clientes }      from '@/pages/Clientes'
@@ -53,6 +54,8 @@ export default function App() {
       </div>
 
       <MobileNav />
+
+      <Toaster />
 
       {facturaModal && (
         <NuevaFacturaModal

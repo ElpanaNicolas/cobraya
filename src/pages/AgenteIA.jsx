@@ -182,7 +182,12 @@ function ChatPanel({ conv }) {
 export function AgenteIA() {
   const { data: convs, loading } = useApi(useCallback(() => api.getConversations(null), []))
   const [selected, setSelected] = useState(null)
+  const [search, setSearch]     = useState('')
 
+  const filteredConvs = (convs ?? []).filter(c =>
+    c.client.toLowerCase().includes(search.toLowerCase()) ||
+    (c.invoiceId ?? '').toLowerCase().includes(search.toLowerCase())
+  )
   const activeConv = (convs ?? []).find(c => c.clientId === selected) ?? null
 
   return (
@@ -195,8 +200,19 @@ export function AgenteIA() {
         overflow: 'hidden',
       }}>
         <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
-          <div style={{ fontFamily: 'var(--font-ui)', fontWeight: 700, fontSize: 13 }}>Conversaciones</div>
-          <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>WhatsApp · gestionadas por el agente</div>
+          <div style={{ fontFamily: 'var(--font-ui)', fontWeight: 700, fontSize: 13, marginBottom: 8 }}>Conversaciones</div>
+          <div style={{ position: 'relative' }}>
+            <span style={{ position: 'absolute', left: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 11, color: 'var(--muted)', pointerEvents: 'none' }}>⌕</span>
+            <input
+              value={search} onChange={e => setSearch(e.target.value)}
+              placeholder="Buscar cliente…"
+              style={{
+                width: '100%', background: 'var(--surface2)', border: '1px solid var(--border2)',
+                borderRadius: 6, padding: '6px 10px 6px 24px',
+                color: 'var(--white)', fontSize: 11, fontFamily: 'var(--font-mono)', outline: 'none',
+              }}
+            />
+          </div>
         </div>
 
         <div style={{ flex: 1, overflowY: 'auto' }}>
@@ -207,7 +223,11 @@ export function AgenteIA() {
                 <Skeleton h={10} w={100} />
               </div>
             ))
-          ) : (convs ?? []).map(conv => (
+          ) : filteredConvs.length === 0 ? (
+            <div style={{ padding: '40px 16px', textAlign: 'center', color: 'var(--muted)', fontSize: 11 }}>
+              {search ? `Sin resultados para "${search}"` : 'Sin conversaciones activas'}
+            </div>
+          ) : filteredConvs.map(conv => (
             <ConvItem
               key={conv.clientId}
               conv={conv}
@@ -228,8 +248,14 @@ export function AgenteIA() {
               <div style={{ fontSize: 9, color: 'var(--muted)', fontFamily: 'var(--font-ui)' }}>ACTIVAS</div>
             </div>
             <div style={{ textAlign: 'center' }}>
+              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 18, color: 'var(--green-l)' }}>
+                {convs.reduce((s, c) => s + (c.messages?.filter(m => m.from === 'client' && m.status !== 'read').length ?? 0), 0) || '—'}
+              </div>
+              <div style={{ fontSize: 9, color: 'var(--muted)', fontFamily: 'var(--font-ui)' }}>NO LEÍDOS</div>
+            </div>
+            <div style={{ textAlign: 'center' }}>
               <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 18 }}>
-                {convs.reduce((s, c) => s + c.messages.length, 0)}
+                {convs.reduce((s, c) => s + (c.messages?.length ?? 0), 0)}
               </div>
               <div style={{ fontSize: 9, color: 'var(--muted)', fontFamily: 'var(--font-ui)' }}>MENSAJES</div>
             </div>
