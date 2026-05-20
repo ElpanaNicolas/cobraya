@@ -4,7 +4,7 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { callClaude }   from '../_shared/claude.ts'
+import { callClaude, fetchTwilioImageAsBase64, detectPaymentReceipt } from '../_shared/claude.ts'
 
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL')!,
@@ -33,11 +33,14 @@ async function sendReply(to: string, body: string, sid: string, token: string, f
 
 serve(async (req) => {
   // Twilio envía POST con form-data
-  const rawBody     = await req.text()
-  const form        = new URLSearchParams(rawBody)
-  const from        = form.get('From') ?? ''   // "whatsapp:+59899123456" — cliente
-  const to          = form.get('To')   ?? ''   // "whatsapp:+14155238886" — negocio
-  const body        = form.get('Body') ?? ''
+  const rawBody        = await req.text()
+  const form           = new URLSearchParams(rawBody)
+  const from           = form.get('From')              ?? ''
+  const to             = form.get('To')                ?? ''
+  const body           = form.get('Body')              ?? ''
+  const numMedia       = parseInt(form.get('NumMedia') ?? '0')
+  const mediaUrl       = form.get('MediaUrl0')         ?? ''
+  const mediaType      = form.get('MediaContentType0') ?? ''
 
   // Protección básica: verificar token secreto en query string
   // La URL del webhook debe incluir ?token=WEBHOOK_SECRET
@@ -128,9 +131,52 @@ serve(async (req) => {
       supabase.from('agent_config').select('*').eq('profile_id', client.profile_id).single(),
       supabase.from('profiles').select('company, signature, twilio_account_sid, twilio_auth_token, twilio_wa_number').eq('id', client.profile_id).single(),
       conv.invoice_id
-        ? supabase.from('invoices').select('cfe_id, amount, due, status').eq('id', conv.invoice_id).single()
+        ? supabase.from('invoices').select('id, cfe_id, amount, due, status').eq('id', conv.invoice_id).single()
         : Promise.resolve({ data: null }),
     ])
+
+    const twilioSid   = profileData?.twilio_account_sid || Deno.env.get('TWILIO_ACCOUNT_SID')!
+    const twilioToken = profileData?.twilio_auth_token  || Deno.env.get('TWILIO_AUTH_TOKEN')!
+    const twilioFrom  = profileData?.twilio_wa_number   || Deno.env.get('TWILIO_WHATSAPP_NUMBER')!
+
+    // ── 5b. Detección de comprobante de pago ─────────────────
+    // Si el cliente mandó una imagen o texto con comprobante, registrar el pago automáticamente.
+    const hasMedia = numMedia > 0 && mediaUrl && mediaType.startsWith('image/')
+    if ((hasMedia || body) && conv.invoice_id && invoice && invoice.status !== 'paid') {
+      // Descargar imagen si la hay
+      const imageBase64 = hasMedia
+        ? await fetchTwilioImageAsBase64(mediaUrl, twilioSid, twilioToken)
+        : null
+
+      const detection = await detectPaymentReceipt(body, imageBase64)
+
+      if (detection.isPayment) {
+        console.log(`💰 Comprobante detectado para factura ${invoice.cfe_id}:`, detection)
+
+        // Marcar factura como pagada
+        await supabase.from('invoices').update({ status: 'paid' }).eq('id', conv.invoice_id)
+
+        // Armar mensaje de confirmación con los datos extraídos
+        const details = [
+          detection.amount  ? `Importe: $${detection.amount.toLocaleString('es-UY')} UYU` : null,
+          detection.bank    ? `Banco: ${detection.bank}`                                   : null,
+          detection.reference ? `Referencia: ${detection.reference}`                       : null,
+        ].filter(Boolean).join(' · ')
+
+        const confirmMsg = `¡Gracias! Recibimos tu comprobante de pago${details ? ` (${details})` : ''}. Quedó registrado. ¡Que tengas un excelente día! 🙏\n— ${profileData?.company ?? 'El equipo de cobros'}`
+
+        // Guardar confirmación en DB y enviar
+        await supabase.from('messages').insert({
+          conversation_id: conv.id,
+          from_role:       'agent',
+          body:            confirmMsg,
+          status:          'sent',
+        })
+        await sendReply(from, confirmMsg, twilioSid, twilioToken, twilioFrom)
+
+        return twiml('')   // cortar aquí, no hace falta respuesta genérica de Claude
+      }
+    }
 
     const toneMap: Record<string, string> = {
       profesional: 'formal y profesional',
@@ -168,10 +214,6 @@ serve(async (req) => {
     })
 
     // ── 8. Enviar por WhatsApp con las credenciales del negocio ─
-    // Usa las del perfil; si no las cargó, cae a los secrets de entorno (dev/testing)
-    const twilioSid   = profileData?.twilio_account_sid || Deno.env.get('TWILIO_ACCOUNT_SID')!
-    const twilioToken = profileData?.twilio_auth_token  || Deno.env.get('TWILIO_AUTH_TOKEN')!
-    const twilioFrom  = profileData?.twilio_wa_number   || Deno.env.get('TWILIO_WHATSAPP_NUMBER')!
     await sendReply(from, reply, twilioSid, twilioToken, twilioFrom)
 
     return twiml('')   // respuesta vacía (ya enviamos con la API REST)
