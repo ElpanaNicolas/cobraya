@@ -1,16 +1,48 @@
-# React + Vite
+# Cobraya
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+App de gestión de cobros con agente IA que automatiza el contacto con clientes por WhatsApp.
 
-Currently, two official plugins are available:
+**Demo:** https://cobraya-phi.vercel.app
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## Stack
 
-## React Compiler
+- React 18 + Vite
+- Supabase (auth + base de datos + RLS)
+- recharts, lucide-react, date-fns
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Funcionalidades
 
-## Expanding the ESLint configuration
+- Dashboard con KPIs, gráfico de tendencia y feed de actividad del agente
+- Gestión de facturas con estados: pendiente, recordatorio, IA negociando, vencida, pagada
+- Historial de conversaciones WhatsApp por cliente y factura
+- Score de riesgo por cliente basado en historial de pagos
+- Agente IA configurable: tono, timing, plan de cuotas automático
+- Autenticación con email y contraseña
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+## Desarrollo local
+
+```bash
+# 1. Clonar
+git clone https://github.com/ElpanaNicolas/cobraya
+cd cobraya
+
+# 2. Instalar dependencias
+npm install
+
+# 3. Configurar variables de entorno
+cp .env.example .env.local
+# Editar .env.local con tu URL y anon key de Supabase
+
+# 4. Ejecutar el schema en Supabase SQL Editor
+# → supabase_schema.sql
+
+# 5. Arrancar
+npm run dev
+```
+
+## Variables de entorno
+
+```
+VITE_SUPABASE_URL=https://tu-proyecto.supabase.co
+VITE_SUPABASE_ANON_KEY=tu-anon-key
+```
