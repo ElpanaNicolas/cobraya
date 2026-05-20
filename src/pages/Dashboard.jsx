@@ -1,0 +1,41 @@
+import { api } from '@/api'
+import { useApi } from '@/hooks/useApi'
+import { KPICards }     from '@/components/dashboard/KPICards'
+import { TrendChart }   from '@/components/dashboard/TrendChart'
+import { ActivityFeed } from '@/components/dashboard/ActivityFeed'
+import { InvoiceTable } from '@/components/invoices/InvoiceTable'
+
+export function Dashboard() {
+  const kpis      = useApi(api.getKPIs)
+  const invoices  = useApi(api.getInvoices)
+  const activity  = useApi(api.getActivity)
+  const chart     = useApi(api.getChartData)
+
+  const handleAction = async (action, invoiceId) => {
+    if (action === 'paid')     await api.markPaid(invoiceId)
+    if (action === 'reminder') await api.sendReminder(invoiceId)
+    if (action === 'ai')       await api.activateAI(invoiceId)
+    invoices.refetch()
+  }
+
+  return (
+    <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+      {/* KPIs */}
+      <KPICards data={kpis.data} loading={kpis.loading} />
+
+      {/* Chart + Feed */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 16 }}>
+        <TrendChart data={chart.data} loading={chart.loading} />
+        <ActivityFeed data={activity.data} loading={activity.loading} />
+      </div>
+
+      {/* Invoices */}
+      <InvoiceTable
+        data={invoices.data}
+        loading={invoices.loading}
+        onAction={handleAction}
+      />
+    </div>
+  )
+}
