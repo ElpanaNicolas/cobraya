@@ -15,6 +15,7 @@ import { AgenteIA }      from '@/pages/AgenteIA'
 import { Configuracion } from '@/pages/Configuracion'
 import { Login }         from '@/pages/Login'
 import { PaginaPago }    from '@/pages/PaginaPago'
+import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard'
 
 function Spinner() {
   return (
@@ -31,7 +32,7 @@ function Spinner() {
 
 export default function App() {
   const { session, loading: authLoading } = useAuth()
-  const { data: user } = useApi(api.getUser)
+  const { data: user, refetch: refreshUser } = useApi(api.getUser)
   const [facturaModal, setFacturaModal] = useState(false)
   const [facturaKey, setFacturaKey] = useState(0)
 
@@ -40,6 +41,19 @@ export default function App() {
 
   if (authLoading) return <Spinner />
   if (!session)    return <Login />
+
+  // Onboarding — muestra el wizard hasta que se complete
+  if (user && user.onboardingCompleted === false) {
+    return (
+      <>
+        <OnboardingWizard onComplete={async (dest) => {
+          await refreshUser()
+          if (dest === 'config') window.location.href = '/config'
+        }} />
+        <Toaster />
+      </>
+    )
+  }
 
   return (
     <div className="app-layout" style={{ display: 'flex', height: '100vh', overflow: 'hidden' }}>

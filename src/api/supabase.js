@@ -44,7 +44,18 @@ export const api = {
       metaAccessToken:      data.meta_access_token     ?? '',
       metaWabaId:           data.meta_waba_id          ?? '',
       metaVerifyToken:      data.meta_verify_token     ?? '',
+      onboardingCompleted:  data.onboarding_completed  ?? false,
     }
+  },
+
+  async completeOnboarding() {
+    const { data: { user } } = await supabase.auth.getUser()
+    const { error } = await supabase
+      .from('profiles')
+      .update({ onboarding_completed: true })
+      .eq('id', user.id)
+    check(error)
+    return { ok: true }
   },
 
   async getKPIs() {
@@ -393,7 +404,7 @@ export const api = {
     return { ok: true }
   },
 
-  async saveProfile({ company, twilioAccountSid, twilioAuthToken, twilioWaNumber,
+  async saveProfile({ company, signature, twilioAccountSid, twilioAuthToken, twilioWaNumber,
                       paymentInstructions, mpAccessToken,
                       bankName, bankAccount, bankAlias,
                       stripePk, stripeSk,
@@ -403,7 +414,8 @@ export const api = {
     const { error } = await supabase
       .from('profiles')
       .update({
-        company,
+        ...(company   !== undefined && { company }),
+        ...(signature !== undefined && { signature: t(signature) }),
         ...(twilioAccountSid    !== undefined && { twilio_account_sid:    t(twilioAccountSid)   }),
         ...(twilioAuthToken     !== undefined && { twilio_auth_token:     t(twilioAuthToken)    }),
         ...(twilioWaNumber      !== undefined && { twilio_wa_number:      t(twilioWaNumber),
