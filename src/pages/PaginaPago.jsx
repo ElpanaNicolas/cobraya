@@ -57,12 +57,31 @@ function StripeForm({ onSuccess, onError }) {
   )
 }
 
+// ── Datos de demo (no toca Supabase) ──────────────────────────
+const DEMO_INFO = {
+  company:          'Ferretería San José',
+  clientName:       'Supermercado El Sol',
+  cfeId:            'A 0001-000247',
+  amount:           18500,
+  due:              '2025-06-30',
+  status:           'pending',
+  hasMercadoPago:   true,
+  hasStripe:        true,
+  hasBankTransfer:  true,
+  bankName:         'BROU',
+  bankAccount:      '001-0123456/00',
+  bankAlias:        'ferreteriasjose.uy',
+  paymentInstructions: 'Titular: Ferretería San José S.R.L.\nSISTARBANC: indicar número de factura en la referencia.',
+  stripePk:         null,  // no carga Stripe real en demo
+}
+
 // ── Página principal ───────────────────────────────────────────
 export function PaginaPago() {
   const { invoiceId }           = useParams()
+  const isDemo                  = invoiceId === 'demo'
   const [params]                = useSearchParams()
-  const [info, setInfo]         = useState(null)
-  const [loading, setLoading]   = useState(true)
+  const [info, setInfo]         = useState(isDemo ? DEMO_INFO : null)
+  const [loading, setLoading]   = useState(!isDemo)
   const [screen, setScreen]     = useState('main')   // main | bank | stripe | uploading | success | error
   const [msg, setMsg]           = useState('')
   const [mpLoading, setMpLoading] = useState(false)
@@ -70,15 +89,16 @@ export function PaginaPago() {
   const [clientSecret, setClientSecret]   = useState(null)
   const fileRef = useRef()
 
-  // Cargar info de la factura
+  // Cargar info de la factura (solo si no es demo)
   useEffect(() => {
+    if (isDemo) return
     fetch(`${SUPABASE_URL}/functions/v1/get-payment-info?id=${invoiceId}`, {
       headers: { apikey: SUPABASE_ANON_KEY },
     })
       .then(r => r.json())
       .then(d => { setInfo(d); setLoading(false) })
       .catch(() => setLoading(false))
-  }, [invoiceId])
+  }, [invoiceId, isDemo])
 
   // Redirigido de vuelta desde MercadoPago
   useEffect(() => {
@@ -90,6 +110,7 @@ export function PaginaPago() {
 
   // ── Iniciar MercadoPago ──────────────────────────────────────
   async function handleMercadoPago() {
+    if (isDemo) { setScreen('success'); setMsg('Demo: en producción esto redirige a MercadoPago Checkout.'); return }
     setMpLoading(true)
     try {
       const data = await callFn('create-mp-preference', {
@@ -104,6 +125,7 @@ export function PaginaPago() {
 
   // ── Iniciar Stripe ───────────────────────────────────────────
   async function handleStripe() {
+    if (isDemo) { setScreen('success'); setMsg('Demo: en producción esto abre Apple Pay / Google Pay / tarjeta.'); return }
     if (!info?.stripePk) return
     setScreen('stripe')
     if (!stripePromise) setStripePromise(loadStripe(info.stripePk))
@@ -118,6 +140,12 @@ export function PaginaPago() {
   async function handleFileUpload(e) {
     const file = e.target.files?.[0]
     if (!file) return
+    if (isDemo) {
+      setScreen('uploading')
+      await new Promise(r => setTimeout(r, 2000))
+      setScreen('success'); setMsg('Demo: comprobante verificado por IA ✓ (simulación)')
+      return
+    }
     setScreen('uploading')
     try {
       const fd = new FormData()
@@ -230,6 +258,21 @@ export function PaginaPago() {
 
   return (
     <Shell>
+      {/* Banner demo */}
+      {isDemo && (
+        <div style={{
+          width: '100%', padding: '8px 14px', borderRadius: 8, marginBottom: 4,
+          background: 'rgba(99,91,255,0.15)', border: '1px solid rgba(99,91,255,0.3)',
+          display: 'flex', alignItems: 'center', gap: 8,
+        }}>
+          <span style={{ fontSize: 14 }}>🔍</span>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#a5b4fc' }}>Modo demo</div>
+            <div style={{ fontSize: 10, color: '#6b7280' }}>Así ve el link el cliente. Los pagos no son reales.</div>
+          </div>
+        </div>
+      )}
+
       {/* Negocio */}
       <div style={s.bizRow}>
         <div style={s.bizInitials}>{(info.company || 'N').slice(0,2).toUpperCase()}</div>

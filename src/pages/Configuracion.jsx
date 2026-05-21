@@ -320,7 +320,19 @@ export function Configuracion() {
       </Section>
 
       {/* Métodos de pago */}
-      <Section title="Métodos de pago" subtitle="Elegí qué opciones ve el cliente cuando abre el link de pago">
+      <Section title="Métodos de pago" subtitle={
+        <span>
+          Elegí qué opciones ve el cliente cuando abre el link de pago —{' '}
+          <a
+            href="/pagar/demo"
+            target="_blank"
+            rel="noreferrer"
+            style={{ color: 'var(--green-l)', textDecoration: 'none', fontWeight: 600 }}
+          >
+            Ver demo ↗
+          </a>
+        </span>
+      }>
 
         {/* MercadoPago */}
         <div style={{ marginBottom: 20 }}>
