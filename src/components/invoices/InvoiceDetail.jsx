@@ -3,11 +3,46 @@ import { fmt, fmtDate } from '@/lib/utils'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { ChatView } from './ChatView'
+import { api } from '@/api'
+import { toast } from '@/components/ui/Toast'
 
-export function InvoiceDetail({ invoice: inv, onClose, onAction, onDelete }) {
-  const [tab, setTab]       = useState('detalle')
-  const [acting, setActing] = useState(null)
+const inputStyle = {
+  background: 'var(--surface2)', border: '1px solid var(--border2)',
+  borderRadius: 6, padding: '7px 10px', color: 'var(--white)',
+  fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', width: '100%',
+}
+
+export function InvoiceDetail({ invoice: inv, onClose, onAction, onDelete, onEdited }) {
+  const [tab, setTab]         = useState('detalle')
+  const [acting, setActing]   = useState(null)
   const [confirm, setConfirm] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [editForm, setEditForm] = useState({
+    cfeId:  inv.cfeId ?? '',
+    amount: inv.amount ?? '',
+    issued: inv.issued ?? '',
+    due:    inv.due    ?? '',
+  })
+  const [saving, setSaving] = useState(false)
+
+  const handleSaveEdit = async () => {
+    setSaving(true)
+    try {
+      await api.updateInvoice(inv.id, {
+        cfeId:  editForm.cfeId,
+        amount: parseFloat(editForm.amount),
+        issued: editForm.issued,
+        due:    editForm.due,
+      })
+      toast.success('Factura actualizada')
+      setEditing(false)
+      onEdited?.()
+    } catch (e) {
+      toast.error(e.message)
+    } finally {
+      setSaving(false)
+    }
+  }
 
   const act = async (type) => {
     setActing(type)
@@ -40,8 +75,19 @@ export function InvoiceDetail({ invoice: inv, onClose, onAction, onDelete }) {
           }}>{t.label}</button>
         ))}
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}>
+          {/* Edit toggle */}
+          {inv.status !== 'paid' && !confirm && (
+            <button onClick={() => setEditing(e => !e)} style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              fontSize: 11, fontFamily: 'var(--font-ui)', padding: '6px 8px', borderRadius: 4,
+              color: editing ? 'var(--green-l)' : 'var(--muted2)',
+              transition: 'color .15s',
+            }}>
+              {editing ? '✓ Editando' : 'Editar'}
+            </button>
+          )}
           {/* Delete */}
-          {!confirm ? (
+          {!confirm && !editing ? (
             <button onClick={() => setConfirm(true)} style={{
               background: 'none', border: 'none', color: 'var(--muted2)', cursor: 'pointer',
               fontSize: 11, fontFamily: 'var(--font-ui)', padding: '6px 8px', borderRadius: 4,
@@ -79,16 +125,37 @@ export function InvoiceDetail({ invoice: inv, onClose, onAction, onDelete }) {
             <div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--muted)', marginBottom: 6 }}>Cliente</div>
             <div style={{ fontFamily: 'var(--font-ui)', fontWeight: 700, fontSize: 15 }}>{inv.client}</div>
             <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>RUT {inv.rut}</div>
-            <div style={{ fontSize: 10, color: 'var(--muted2)', fontStyle: 'italic', marginTop: 1 }}>{inv.cfeId ?? inv.id}</div>
-            <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
-              <div style={{ fontSize: 10, color: 'var(--muted)' }}>Emisión: <span style={{ color: 'var(--white)' }}>{fmtDate(inv.issued)}</span></div>
-              <div style={{ fontSize: 10, color: 'var(--muted)' }}>Vence: <span style={{ color: 'var(--white)' }}>{fmtDate(inv.due)}</span></div>
-            </div>
+            {!editing && (
+              <>
+                <div style={{ fontSize: 10, color: 'var(--muted2)', fontStyle: 'italic', marginTop: 1 }}>{inv.cfeId ?? inv.id}</div>
+                <div style={{ marginTop: 8, display: 'flex', gap: 8 }}>
+                  <div style={{ fontSize: 10, color: 'var(--muted)' }}>Emisión: <span style={{ color: 'var(--white)' }}>{fmtDate(inv.issued)}</span></div>
+                  <div style={{ fontSize: 10, color: 'var(--muted)' }}>Vence: <span style={{ color: 'var(--white)' }}>{fmtDate(inv.due)}</span></div>
+                </div>
+              </>
+            )}
+            {editing && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
+                <input value={editForm.cfeId} onChange={e => setEditForm(f => ({ ...f, cfeId: e.target.value }))}
+                  placeholder="CFE ID" style={inputStyle} />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
+                  <input type="date" value={editForm.issued} onChange={e => setEditForm(f => ({ ...f, issued: e.target.value }))} style={inputStyle} />
+                  <input type="date" value={editForm.due}    onChange={e => setEditForm(f => ({ ...f, due:    e.target.value }))} style={inputStyle} />
+                </div>
+              </div>
+            )}
           </div>
 
           <div>
             <div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--muted)', marginBottom: 6 }}>Monto</div>
-            <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 22, letterSpacing: '-0.02em' }}>{fmt(inv.amount)}</div>
+            {!editing && (
+              <div style={{ fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 22, letterSpacing: '-0.02em' }}>{fmt(inv.amount)}</div>
+            )}
+            {editing && (
+              <input type="number" value={editForm.amount}
+                onChange={e => setEditForm(f => ({ ...f, amount: e.target.value }))}
+                style={{ ...inputStyle, fontFamily: 'var(--font-display)', fontSize: 18, fontWeight: 700 }} />
+            )}
             <div style={{ marginTop: 8 }}><Badge status={inv.status} /></div>
           </div>
 
@@ -103,7 +170,7 @@ export function InvoiceDetail({ invoice: inv, onClose, onAction, onDelete }) {
                 {inv.aiNote}
               </div>
             )}
-            {inv.status !== 'paid' && (
+            {inv.status !== 'paid' && !editing && (
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                 <Button size="sm" onClick={() => act('paid')} disabled={!!acting}>
                   {acting === 'paid' ? '…' : '✓ Marcar pagada'}
@@ -114,6 +181,14 @@ export function InvoiceDetail({ invoice: inv, onClose, onAction, onDelete }) {
                 <Button variant="ghost" size="sm" onClick={() => act('ai')} disabled={!!acting}>
                   {acting === 'ai' ? '…' : '🤖 Activar IA'}
                 </Button>
+              </div>
+            )}
+            {editing && (
+              <div style={{ display: 'flex', gap: 6 }}>
+                <Button size="sm" onClick={handleSaveEdit} disabled={saving}>
+                  {saving ? 'Guardando…' : '✓ Guardar'}
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setEditing(false)}>Cancelar</Button>
               </div>
             )}
             {inv.status === 'paid' && (

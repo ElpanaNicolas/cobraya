@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { InvoiceDetail } from './InvoiceDetail'
+import { ImportarFacturasModal } from './ImportarFacturasModal'
 
 const FILTERS = [
   { id: 'all',           label: 'Todas'        },
@@ -39,7 +40,7 @@ function matchesDateFilter(inv, dateFilter) {
   return true
 }
 
-const COLS = ['CFE / ID', 'Cliente', 'Monto', 'Vencimiento', 'Canal', 'Estado', '']
+const COLS = ['', 'CFE / ID', 'Cliente', 'Monto', 'Vencimiento', 'Canal', 'Estado', '']
 
 function exportCsv(rows) {
   const headers = ['CFE/ID', 'Cliente', 'RUT', 'Monto (UYU)', 'Emisión', 'Vencimiento', 'Canal', 'Estado']
@@ -64,11 +65,14 @@ function exportCsv(rows) {
   URL.revokeObjectURL(url)
 }
 
-export function InvoiceTable({ data, loading, onAction, onDelete }) {
-  const [filter, setFilter]       = useState('all')
+export function InvoiceTable({ data, loading, onAction, onDelete, onRefetch }) {
+  const [filter, setFilter]         = useState('all')
   const [dateFilter, setDateFilter] = useState('all')
-  const [search, setSearch]       = useState('')
-  const [selected, setSelected]   = useState(null)
+  const [search, setSearch]         = useState('')
+  const [selected, setSelected]     = useState(null)
+  const [checked, setChecked]       = useState(new Set())
+  const [bulkLoading, setBulkLoading] = useState(false)
+  const [showImport, setShowImport] = useState(false)
 
   const filtered = (data ?? []).filter(inv => {
     const matchStatus = filter === 'all' || inv.status === filter
@@ -78,6 +82,34 @@ export function InvoiceTable({ data, loading, onAction, onDelete }) {
     return matchStatus && matchDate && matchSearch
   })
 
+  const pendingFiltered = filtered.filter(i => ['pending', 'reminded', 'ai_negotiating', 'overdue'].includes(i.status))
+  const allChecked = pendingFiltered.length > 0 && pendingFiltered.every(i => checked.has(i.id))
+
+  const toggleAll = () => {
+    if (allChecked) setChecked(new Set())
+    else setChecked(new Set(pendingFiltered.map(i => i.id)))
+  }
+  const toggleOne = (id, e) => {
+    e.stopPropagation()
+    setChecked(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
+  }
+
+  const handleBulkReminder = async () => {
+    if (!checked.size) return
+    setBulkLoading(true)
+    try {
+      const { sent, failed } = await import('@/api').then(m => m.api.bulkReminder([...checked]))
+      if (sent > 0) { const { toast } = await import('@/components/ui/Toast'); toast.success(`${sent} recordatorio${sent > 1 ? 's' : ''} enviado${sent > 1 ? 's' : ''}`) }
+      if (failed > 0) { const { toast } = await import('@/components/ui/Toast'); toast.error(`${failed} error${failed > 1 ? 'es' : ''}`) }
+      setChecked(new Set())
+      onRefetch?.()
+    } catch (e) {
+      const { toast } = await import('@/components/ui/Toast'); toast.error(e.message)
+    } finally {
+      setBulkLoading(false)
+    }
+  }
+
   return (
     <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden' }}>
 
@@ -86,27 +118,47 @@ export function InvoiceTable({ data, loading, onAction, onDelete }) {
         padding: '13px 18px', borderBottom: '1px solid var(--border)',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <div style={{ fontFamily: 'var(--font-ui)', fontWeight: 700, fontSize: 13 }}>
             Facturas
             {data && <span style={{ marginLeft: 7, fontSize: 10, color: 'var(--muted)', fontWeight: 400 }}>{filtered.length} / {data.length}</span>}
           </div>
+
+          {/* Bulk reminder */}
+          {checked.size > 0 && (
+            <button onClick={handleBulkReminder} disabled={bulkLoading} style={{
+              display: 'flex', alignItems: 'center', gap: 5,
+              padding: '4px 12px', borderRadius: 6, cursor: 'pointer',
+              background: 'rgba(45,158,95,0.12)', border: '1px solid rgba(45,158,95,0.4)',
+              color: 'var(--green-l)', fontSize: 10, fontFamily: 'var(--font-ui)', fontWeight: 700,
+            }}>
+              {bulkLoading ? '…' : `📲 Recordatorio a ${checked.size}`}
+            </button>
+          )}
+
+          {/* Import CSV */}
+          <button onClick={() => setShowImport(true)} style={{
+            display: 'flex', alignItems: 'center', gap: 5,
+            padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
+            background: 'transparent', border: '1px solid var(--border2)',
+            color: 'var(--muted)', fontSize: 10, fontFamily: 'var(--font-ui)', fontWeight: 700,
+            transition: 'all .15s',
+          }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(45,158,95,0.5)'; e.currentTarget.style.color = 'var(--green-l)' }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border2)'; e.currentTarget.style.color = 'var(--muted)' }}
+          >↑ Importar</button>
+
           {filtered.length > 0 && (
-            <button
-              onClick={() => exportCsv(filtered)}
-              title="Exportar CSV"
-              style={{
-                display: 'flex', alignItems: 'center', gap: 5,
-                padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
-                background: 'transparent', border: '1px solid var(--border2)',
-                color: 'var(--muted)', fontSize: 10, fontFamily: 'var(--font-ui)', fontWeight: 700,
-                transition: 'all .15s',
-              }}
+            <button onClick={() => exportCsv(filtered)} style={{
+              display: 'flex', alignItems: 'center', gap: 5,
+              padding: '4px 10px', borderRadius: 6, cursor: 'pointer',
+              background: 'transparent', border: '1px solid var(--border2)',
+              color: 'var(--muted)', fontSize: 10, fontFamily: 'var(--font-ui)', fontWeight: 700,
+              transition: 'all .15s',
+            }}
               onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(45,158,95,0.5)'; e.currentTarget.style.color = 'var(--green-l)' }}
               onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border2)'; e.currentTarget.style.color = 'var(--muted)' }}
-            >
-              ↓ CSV
-            </button>
+            >↓ CSV</button>
           )}
         </div>
 
@@ -165,7 +217,11 @@ export function InvoiceTable({ data, loading, onAction, onDelete }) {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
           <thead>
             <tr style={{ borderBottom: '1px solid var(--border)' }}>
-              {COLS.map(h => (
+              <th style={{ padding: '9px 12px', width: 36 }}>
+                <input type="checkbox" checked={allChecked} onChange={toggleAll}
+                  style={{ cursor: 'pointer', accentColor: 'var(--green)' }} />
+              </th>
+              {COLS.slice(1).map(h => (
                 <th key={h} style={{ padding: '9px 16px', textAlign: 'left', fontSize: 9, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)', fontWeight: 700, fontFamily: 'var(--font-ui)', whiteSpace: 'nowrap' }}>{h}</th>
               ))}
             </tr>
@@ -199,8 +255,10 @@ export function InvoiceTable({ data, loading, onAction, onDelete }) {
               </tr>
             ) : (
               filtered.map((inv, i) => {
-                const days = daysUntil(inv.due)
+                const days  = daysUntil(inv.due)
                 const isSel = selected?.id === inv.id
+                const isChk = checked.has(inv.id)
+                const canCheck = ['pending','reminded','ai_negotiating','overdue'].includes(inv.status)
                 return (
                   <tr key={inv.id}
                     onClick={() => setSelected(isSel ? null : inv)}
@@ -208,12 +266,19 @@ export function InvoiceTable({ data, loading, onAction, onDelete }) {
                     style={{
                       animationDelay: `${i * .035}s`,
                       borderBottom: '1px solid var(--border)',
-                      background: isSel ? 'rgba(45,158,95,0.06)' : 'transparent',
+                      background: isChk ? 'rgba(45,158,95,0.04)' : isSel ? 'rgba(45,158,95,0.06)' : 'transparent',
                       cursor: 'pointer', transition: 'background .13s',
                     }}
-                    onMouseEnter={e => { if (!isSel) e.currentTarget.style.background = 'rgba(255,255,255,0.02)' }}
-                    onMouseLeave={e => { e.currentTarget.style.background = isSel ? 'rgba(45,158,95,0.06)' : 'transparent' }}
+                    onMouseEnter={e => { if (!isSel && !isChk) e.currentTarget.style.background = 'rgba(255,255,255,0.02)' }}
+                    onMouseLeave={e => { e.currentTarget.style.background = isChk ? 'rgba(45,158,95,0.04)' : isSel ? 'rgba(45,158,95,0.06)' : 'transparent' }}
                   >
+                    <td style={{ padding: '12px 12px', width: 36 }}>
+                      {canCheck && (
+                        <input type="checkbox" checked={isChk} onChange={e => toggleOne(inv.id, e)}
+                          onClick={e => e.stopPropagation()}
+                          style={{ cursor: 'pointer', accentColor: 'var(--green)' }} />
+                      )}
+                    </td>
                     <td style={{ padding: '12px 16px', color: 'var(--muted)', fontStyle: 'italic', fontSize: 10 }}>{inv.cfeId ?? inv.id}</td>
                     <td style={{ padding: '12px 16px', fontFamily: 'var(--font-ui)', fontWeight: 600, fontSize: 12 }}>{inv.client}</td>
                     <td style={{ padding: '12px 16px', fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 14, letterSpacing: '-0.01em' }}>{fmt(inv.amount)}</td>
@@ -251,6 +316,14 @@ export function InvoiceTable({ data, loading, onAction, onDelete }) {
           onClose={() => setSelected(null)}
           onAction={async (action) => { await onAction(action, selected.id); setSelected(null) }}
           onDelete={async () => { await onDelete(selected.id); setSelected(null) }}
+          onEdited={() => { setSelected(null); onRefetch?.() }}
+        />
+      )}
+
+      {showImport && (
+        <ImportarFacturasModal
+          onClose={() => setShowImport(false)}
+          onImported={() => { setShowImport(false); onRefetch?.() }}
         />
       )}
     </div>

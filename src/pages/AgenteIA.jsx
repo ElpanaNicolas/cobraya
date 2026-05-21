@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { api } from '@/api'
 import { useApi } from '@/hooks/useApi'
+import { supabase } from '@/lib/supabase'
 import { fmt } from '@/lib/utils'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { toast } from '@/components/ui/Toast'
@@ -89,6 +90,28 @@ function ChatPanel({ conv, onBack }) {
 
   // Sincronizar cuando cambia la conversación activa
   useEffect(() => { setMsgs(conv?.messages ?? []) }, [conv?.id])
+
+  // Realtime: escuchar mensajes nuevos en esta conversación
+  useEffect(() => {
+    if (!conv?.id) return
+    const channel = supabase
+      .channel(`chat-${conv.id}`)
+      .on('postgres_changes', {
+        event: 'INSERT', schema: 'public', table: 'messages',
+        filter: `conversation_id=eq.${conv.id}`,
+      }, (payload) => {
+        const m = payload.new
+        setMsgs(prev => {
+          // evitar duplicados de mensajes optimistas
+          if (prev.some(x => x.id === m.id)) return prev
+          return [...prev.filter(x => !String(x.id).startsWith('opt-')), {
+            id: m.id, from: m.from_role, text: m.body, ts: m.sent_at, status: m.status,
+          }]
+        })
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [conv?.id])
 
   // Auto-scroll al fondo
   useEffect(() => {
@@ -244,9 +267,20 @@ function ChatPanel({ conv, onBack }) {
 }
 
 export function AgenteIA() {
-  const { data: convs, loading } = useApi(useCallback(() => api.getConversations(null), []))
+  const { data: convs, loading, refetch } = useApi(useCallback(() => api.getConversations(null), []))
   const [selected, setSelected] = useState(null)
   const [search, setSearch]     = useState('')
+
+  // Realtime: recargar conversaciones cuando llega un mensaje nuevo
+  useEffect(() => {
+    const channel = supabase
+      .channel('messages-realtime')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {
+        refetch()
+      })
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+  }, [refetch])
 
   const filteredConvs = (convs ?? []).filter(c =>
     c.client.toLowerCase().includes(search.toLowerCase()) ||

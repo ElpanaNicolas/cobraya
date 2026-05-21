@@ -97,6 +97,7 @@ export function Facturas() {
         loading={invoices.loading}
         onAction={handleAction}
         onDelete={handleDelete}
+        onRefetch={invoices.refetch}
       />
     </div>
   )

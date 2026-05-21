@@ -6,6 +6,7 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { Button } from '@/components/ui/Button'
 import { ChatView } from '@/components/invoices/ChatView'
 import { NuevoClienteModal } from '@/components/clientes/NuevoClienteModal'
+import { EditarClienteModal } from '@/components/clientes/EditarClienteModal'
 import { toast } from '@/components/ui/Toast'
 
 function riskLabel(score) {
@@ -37,7 +38,7 @@ function ScoreBar({ score }) {
   )
 }
 
-function ClientRow({ client, expanded, onToggle, onDelete }) {
+function ClientRow({ client, expanded, onToggle, onDelete, onEdit }) {
   const [chatTab, setChatTab]   = useState(false)
   const [confirm, setConfirm]   = useState(false)
   const [deleting, setDeleting] = useState(false)
@@ -85,6 +86,12 @@ function ClientRow({ client, expanded, onToggle, onDelete }) {
             <span style={{ fontSize: 10, fontFamily: 'var(--font-ui)', fontWeight: 700, color: expanded ? 'var(--green-l)' : 'var(--muted)' }}>
               {expanded ? 'Cerrar ↑' : 'Ver →'}
             </span>
+            <span
+              onClick={e => { e.stopPropagation(); onEdit(client) }}
+              style={{ fontSize: 10, color: 'var(--muted2)', cursor: 'pointer', fontFamily: 'var(--font-ui)', transition: 'color .15s' }}
+              onMouseEnter={e => e.currentTarget.style.color = 'var(--green-l)'}
+              onMouseLeave={e => e.currentTarget.style.color = 'var(--muted2)'}
+            >Editar</span>
             {!confirm ? (
               <span
                 onClick={e => { e.stopPropagation(); setConfirm(true) }}
@@ -183,6 +190,7 @@ export function Clientes() {
   const [expanded, setExpanded] = useState(null)
   const [search, setSearch]     = useState('')
   const [modal, setModal]       = useState(false)
+  const [editClient, setEditClient] = useState(null)
 
   const handleDelete = async (clientId) => {
     try {
@@ -260,6 +268,7 @@ export function Clientes() {
                     expanded={expanded === c.id}
                     onToggle={() => setExpanded(expanded === c.id ? null : c.id)}
                     onDelete={handleDelete}
+                    onEdit={setEditClient}
                   />
                 ))
               )}
@@ -272,6 +281,13 @@ export function Clientes() {
         <NuevoClienteModal
           onClose={() => setModal(false)}
           onCreated={() => refetch()}
+        />
+      )}
+      {editClient && (
+        <EditarClienteModal
+          client={editClient}
+          onClose={() => setEditClient(null)}
+          onSaved={() => refetch()}
         />
       )}
     </div>

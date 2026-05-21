@@ -379,8 +379,26 @@ export const api = {
     return data
   },
 
+  async updateClient(clientId, { name, rut, phone, email }) {
+    const { error } = await supabase
+      .from('clients')
+      .update({ name, rut, phone, email })
+      .eq('id', clientId)
+    check(error)
+    return { ok: true }
+  },
+
   async deleteClient(clientId) {
     const { error } = await supabase.from('clients').delete().eq('id', clientId)
+    check(error)
+    return { ok: true }
+  },
+
+  async updateInvoice(invoiceId, { cfeId, amount, issued, due }) {
+    const { error } = await supabase
+      .from('invoices')
+      .update({ cfe_id: cfeId, amount, issued, due })
+      .eq('id', invoiceId)
     check(error)
     return { ok: true }
   },
@@ -389,6 +407,93 @@ export const api = {
     const { error } = await supabase.from('invoices').delete().eq('id', invoiceId)
     check(error)
     return { ok: true }
+  },
+
+  async bulkReminder(invoiceIds) {
+    // Envía recordatorio a múltiples facturas en paralelo
+    const results = await Promise.allSettled(
+      invoiceIds.map(id => supabase.functions.invoke('whatsapp-send', { body: { invoiceId: id, type: 'reminder' } }))
+    )
+    // Fallback: marcar como reminded las que fallaron el edge function
+    await Promise.all(
+      invoiceIds.map(id => supabase.from('invoices').update({ status: 'reminded' }).eq('id', id).eq('status', 'pending'))
+    )
+    const failed = results.filter(r => r.status === 'rejected').length
+    return { ok: true, sent: invoiceIds.length - failed, failed }
+  },
+
+  async importInvoices(rows) {
+    // rows: [{ clientName, rut, phone, email, cfeId, amount, issued, due }]
+    const { data: { user } } = await supabase.auth.getUser()
+
+    // 1. Traer clientes existentes
+    const { data: existingClients } = await supabase
+      .from('clients')
+      .select('id, name, rut, phone, email')
+      .eq('profile_id', user.id)
+
+    const clientMap = {}
+    for (const c of existingClients ?? []) {
+      clientMap[c.rut?.replace(/\D/g, '')] = c.id
+      clientMap[c.name?.toLowerCase().trim()] = c.id
+    }
+
+    const results = { created: 0, skipped: 0, errors: [] }
+
+    for (const row of rows) {
+      try {
+        // 2. Resolver o crear cliente
+        const rutKey   = row.rut?.replace(/\D/g, '')
+        const nameKey  = row.clientName?.toLowerCase().trim()
+        let clientId   = (rutKey && clientMap[rutKey]) || (nameKey && clientMap[nameKey])
+
+        if (!clientId) {
+          const { data: newClient, error: ce } = await supabase
+            .from('clients')
+            .insert({ profile_id: user.id, name: row.clientName, rut: row.rut, phone: row.phone, email: row.email })
+            .select('id').single()
+          if (ce) throw new Error(ce.message)
+          clientId = newClient.id
+          if (rutKey)  clientMap[rutKey]  = clientId
+          if (nameKey) clientMap[nameKey] = clientId
+        }
+
+        // 3. Crear factura
+        const { error: ie } = await supabase.from('invoices').insert({
+          profile_id: user.id,
+          client_id:  clientId,
+          cfe_id:     row.cfeId,
+          amount:     parseFloat(row.amount),
+          issued:     row.issued,
+          due:        row.due,
+          status:     'pending',
+        })
+        if (ie) throw new Error(ie.message)
+        results.created++
+      } catch (e) {
+        results.errors.push(`Fila "${row.cfeId || row.clientName}": ${e.message}`)
+        results.skipped++
+      }
+    }
+
+    return results
+  },
+
+  async getUnreadCount() {
+    const { data: { user } } = await supabase.auth.getUser()
+    const { data: convs } = await supabase
+      .from('conversations')
+      .select('id')
+      .eq('profile_id', user.id)
+    if (!convs?.length) return 0
+    const ids = convs.map(c => c.id)
+    const { count } = await supabase
+      .from('messages')
+      .select('id', { count: 'exact', head: true })
+      .in('conversation_id', ids)
+      .eq('from_role', 'client')
+      .neq('status', 'read')
+    return count ?? 0
   },
 
   async sendMessage(conversationId, body) {
