@@ -29,9 +29,16 @@ export const api = {
       initials:         displayName.slice(0,2).toUpperCase(),
       company:          data.company,
       whatsappNumber:   data.whatsapp,
-      twilioAccountSid: data.twilio_account_sid ?? '',
-      twilioAuthToken:  data.twilio_auth_token  ?? '',
-      twilioWaNumber:   data.twilio_wa_number   ?? '',
+      twilioAccountSid:     data.twilio_account_sid    ?? '',
+      twilioAuthToken:      data.twilio_auth_token     ?? '',
+      twilioWaNumber:       data.twilio_wa_number      ?? '',
+      paymentInstructions:  data.payment_instructions  ?? '',
+      mpAccessToken:        data.mp_access_token       ?? '',
+      bankName:             data.bank_name             ?? '',
+      bankAccount:          data.bank_account          ?? '',
+      bankAlias:            data.bank_alias            ?? '',
+      stripePk:             data.stripe_pk             ?? '',
+      stripeSk:             data.stripe_sk             ?? '',
     }
   },
 
@@ -381,17 +388,27 @@ export const api = {
     return { ok: true }
   },
 
-  async saveProfile({ company, twilioAccountSid, twilioAuthToken, twilioWaNumber }) {
+  async saveProfile({ company, twilioAccountSid, twilioAuthToken, twilioWaNumber,
+                      paymentInstructions, mpAccessToken,
+                      bankName, bankAccount, bankAlias,
+                      stripePk, stripeSk }) {
     const { data: { user } } = await supabase.auth.getUser()
-    // .trim() evita que espacios o saltos de línea corrompan las credenciales
+    const t = v => (v ?? '').trim()
     const { error } = await supabase
       .from('profiles')
       .update({
         company,
-        ...(twilioAccountSid !== undefined && { twilio_account_sid: twilioAccountSid.trim() }),
-        ...(twilioAuthToken  !== undefined && { twilio_auth_token:  twilioAuthToken.trim()  }),
-        ...(twilioWaNumber   !== undefined && { twilio_wa_number:   twilioWaNumber.trim(),
-                                               whatsapp:            twilioWaNumber.trim()   }),
+        ...(twilioAccountSid    !== undefined && { twilio_account_sid:   t(twilioAccountSid)   }),
+        ...(twilioAuthToken     !== undefined && { twilio_auth_token:    t(twilioAuthToken)    }),
+        ...(twilioWaNumber      !== undefined && { twilio_wa_number:     t(twilioWaNumber),
+                                                   whatsapp:             t(twilioWaNumber)     }),
+        ...(paymentInstructions !== undefined && { payment_instructions: t(paymentInstructions) }),
+        ...(mpAccessToken       !== undefined && { mp_access_token:      t(mpAccessToken)      }),
+        ...(bankName            !== undefined && { bank_name:            t(bankName)            }),
+        ...(bankAccount         !== undefined && { bank_account:         t(bankAccount)         }),
+        ...(bankAlias           !== undefined && { bank_alias:           t(bankAlias)           }),
+        ...(stripePk            !== undefined && { stripe_pk:            t(stripePk)            }),
+        ...(stripeSk            !== undefined && { stripe_sk:            t(stripeSk)            }),
       })
       .eq('id', user.id)
     check(error)

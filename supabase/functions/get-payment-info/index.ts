@@ -32,10 +32,10 @@ serve(async (req) => {
 
   if (error || !invoice) return json({ error: 'Factura no encontrada' }, 404)
 
-  // Datos del negocio — solo campos públicos
+  // Datos del negocio — solo campos públicos, nunca secrets
   const { data: profile } = await supabase
     .from('profiles')
-    .select('company, payment_instructions, mp_access_token')
+    .select('company, payment_instructions, mp_access_token, bank_name, bank_account, bank_alias, stripe_pk')
     .eq('id', invoice.profile_id)
     .single()
 
@@ -47,8 +47,15 @@ serve(async (req) => {
     status:              invoice.status,
     clientName:          invoice.clients?.name ?? '',
     company:             profile?.company ?? '',
-    paymentInstructions: profile?.payment_instructions ?? '',
+    // Métodos de pago disponibles
     hasMercadoPago:      !!(profile?.mp_access_token?.trim()),
+    hasStripe:           !!(profile?.stripe_pk?.trim()),
+    stripePk:            profile?.stripe_pk?.trim() ?? '',       // public key, seguro exponer
+    hasBankTransfer:     !!(profile?.bank_account?.trim()),
+    bankName:            profile?.bank_name            ?? '',
+    bankAccount:         profile?.bank_account         ?? '',
+    bankAlias:           profile?.bank_alias           ?? '',
+    paymentInstructions: profile?.payment_instructions ?? '',
   })
 })
 

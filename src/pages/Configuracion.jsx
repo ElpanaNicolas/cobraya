@@ -96,11 +96,18 @@ export function Configuracion() {
   // Inicializar forms cuando llegan los datos
   if (cfg && !form)   setForm({ ...cfg })
   if (user && !profile) setProfile({
-    company:           user.company ?? '',
-    email:             user.email ?? '',
-    twilioAccountSid:  user.twilioAccountSid ?? '',
-    twilioAuthToken:   user.twilioAuthToken ?? '',
-    twilioWaNumber:    user.twilioWaNumber ?? '',
+    company:             user.company             ?? '',
+    email:               user.email               ?? '',
+    twilioAccountSid:    user.twilioAccountSid    ?? '',
+    twilioAuthToken:     user.twilioAuthToken     ?? '',
+    twilioWaNumber:      user.twilioWaNumber      ?? '',
+    paymentInstructions: user.paymentInstructions ?? '',
+    mpAccessToken:       user.mpAccessToken       ?? '',
+    bankName:            user.bankName            ?? '',
+    bankAccount:         user.bankAccount         ?? '',
+    bankAlias:           user.bankAlias           ?? '',
+    stripePk:            user.stripePk            ?? '',
+    stripeSk:            user.stripeSk            ?? '',
   })
 
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }))
@@ -286,6 +293,113 @@ export function Configuracion() {
               {`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-inbound`}
             </div>
           </Field>
+        </div>
+      </Section>
+
+      {/* Métodos de pago */}
+      <Section title="Métodos de pago" subtitle="Elegí qué opciones ve el cliente cuando abre el link de pago">
+
+        {/* MercadoPago */}
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: profile?.mpAccessToken ? 14 : 0 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 8, background: '#009ee3', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>💳</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 12, fontFamily: 'var(--font-ui)', fontWeight: 700 }}>MercadoPago</div>
+              <div style={{ fontSize: 10, color: 'var(--muted)' }}>Tarjeta, saldo MP, cuotas</div>
+            </div>
+            <Toggle
+              value={!!profile?.mpAccessToken}
+              onChange={v => setProfile(p => ({ ...p, mpAccessToken: v ? (p.mpAccessToken || '') : '' }))}
+              label=""
+            />
+          </div>
+          {(!!profile?.mpAccessToken || profile?.mpAccessToken === '') && (
+            <Field label="Access Token de MercadoPago" hint={<>Conseguilo en <a href="https://www.mercadopago.com.uy/developers/es/docs/getting-started" target="_blank" rel="noreferrer" style={{ color: 'var(--green-l)' }}>mercadopago.com.uy → Credenciales</a></>}>
+              <Input
+                value={profile?.mpAccessToken ?? ''}
+                onChange={e => setProfile(p => ({ ...p, mpAccessToken: e.target.value }))}
+                placeholder="APP_USR-xxxxxxxxxxxxxxxxxxxx"
+                type="password"
+              />
+            </Field>
+          )}
+        </div>
+
+        <div style={{ height: 1, background: 'var(--border)', marginBottom: 20 }} />
+
+        {/* Transferencia bancaria */}
+        <div style={{ marginBottom: 20 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: profile?.bankAccount ? 14 : 0 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 8, background: '#1e3a5f', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>🏦</div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 12, fontFamily: 'var(--font-ui)', fontWeight: 700 }}>Transferencia bancaria</div>
+              <div style={{ fontSize: 10, color: 'var(--muted)' }}>BROU, Itaú, Santander, etc.</div>
+            </div>
+            <Toggle
+              value={!!profile?.bankAccount}
+              onChange={v => setProfile(p => ({ ...p, bankAccount: v ? (p.bankAccount || '') : '' }))}
+              label=""
+            />
+          </div>
+          {(!!profile?.bankAccount || profile?.bankAccount === '') && (
+            <div className="config-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>
+              <Field label="Banco">
+                <Input value={profile?.bankName ?? ''} onChange={e => setProfile(p => ({ ...p, bankName: e.target.value }))} placeholder="BROU" />
+              </Field>
+              <Field label="Número de cuenta">
+                <Input value={profile?.bankAccount ?? ''} onChange={e => setProfile(p => ({ ...p, bankAccount: e.target.value }))} placeholder="001-0123456/00" />
+              </Field>
+              <Field label="Alias (opcional)">
+                <Input value={profile?.bankAlias ?? ''} onChange={e => setProfile(p => ({ ...p, bankAlias: e.target.value }))} placeholder="mi.empresa.uy" />
+              </Field>
+              <div style={{ gridColumn: '1/-1' }}>
+                <Field label="Instrucciones adicionales" hint="Texto libre que verá el cliente (titular, SISTARBANC, etc.)">
+                  <textarea
+                    value={profile?.paymentInstructions ?? ''}
+                    onChange={e => setProfile(p => ({ ...p, paymentInstructions: e.target.value }))}
+                    placeholder="Titular: García & Asociados S.A.&#10;Banco: BROU&#10;Cuenta: 001-0123456/00"
+                    rows={3}
+                    style={{ width: '100%', background: 'var(--surface2)', border: '1px solid var(--border2)', borderRadius: 6, padding: '8px 12px', color: 'var(--white)', fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none', resize: 'vertical' }}
+                  />
+                </Field>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div style={{ height: 1, background: 'var(--border)', marginBottom: 20 }} />
+
+        {/* Stripe / Apple Pay / Google Pay */}
+        <div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: profile?.stripePk ? 14 : 0 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 8, background: '#635bff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>  </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 12, fontFamily: 'var(--font-ui)', fontWeight: 700 }}>Apple Pay · Google Pay · Tarjeta</div>
+              <div style={{ fontSize: 10, color: 'var(--muted)' }}>Vía Stripe — detecta el método según el dispositivo del cliente</div>
+            </div>
+            <Toggle
+              value={!!profile?.stripePk}
+              onChange={v => setProfile(p => ({ ...p, stripePk: v ? (p.stripePk || '') : '', stripeSk: v ? (p.stripeSk || '') : '' }))}
+              label=""
+            />
+          </div>
+          {(!!profile?.stripePk || profile?.stripePk === '') && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+              <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(99,91,255,0.07)', border: '1px solid rgba(99,91,255,0.2)', marginBottom: 14, fontSize: 11, color: 'var(--muted)', lineHeight: 1.6 }}>
+                <span style={{ color: '#a5b4fc', fontWeight: 700 }}>¿Cómo configurarlo?</span>
+                {' '}Crear cuenta en <a href="https://stripe.com" target="_blank" rel="noreferrer" style={{ color: '#a5b4fc' }}>stripe.com</a> → Developers → API Keys.
+                Apple Pay y Google Pay se activan automáticamente según el dispositivo del cliente.
+              </div>
+              <div className="config-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <Field label="Publishable Key" hint="Empieza con pk_live_ o pk_test_">
+                  <Input value={profile?.stripePk ?? ''} onChange={e => setProfile(p => ({ ...p, stripePk: e.target.value }))} placeholder="pk_live_xxxxxxxxxxxx" />
+                </Field>
+                <Field label="Secret Key" hint="Se guarda de forma segura">
+                  <Input value={profile?.stripeSk ?? ''} onChange={e => setProfile(p => ({ ...p, stripeSk: e.target.value }))} placeholder="sk_live_xxxxxxxxxxxx" type="password" />
+                </Field>
+              </div>
+            </div>
+          )}
         </div>
       </Section>
 

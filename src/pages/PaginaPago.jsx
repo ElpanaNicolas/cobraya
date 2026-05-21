@@ -1,9 +1,10 @@
-// Página pública de pago — accesible sin login
-// URL: /pagar/:invoiceId
-// Diseñada para abrirse desde WhatsApp en el celu del cliente
+// Página pública de pago — /pagar/:invoiceId
+// Sin login. Muestra solo los métodos de pago que el negocio configuró.
 
 import { useState, useEffect, useRef } from 'react'
 import { useParams, useSearchParams } from 'react-router-dom'
+import { loadStripe } from '@stripe/stripe-js'
+import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js'
 
 const SUPABASE_URL      = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -20,20 +21,56 @@ function fmt(n) {
   return Number(n).toLocaleString('es-UY', { minimumFractionDigits: 0 })
 }
 
-function statusColor(s) {
-  return s === 'paid' ? '#22c55e' : '#f59e0b'
+// ── Stripe checkout embebido ───────────────────────────────────
+function StripeForm({ onSuccess, onError }) {
+  const stripe   = useStripe()
+  const elements = useElements()
+  const [paying, setPaying] = useState(false)
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (!stripe || !elements) return
+    setPaying(true)
+    const { error } = await stripe.confirmPayment({
+      elements,
+      redirect: 'if_required',
+    })
+    if (error) {
+      onError(error.message)
+    } else {
+      onSuccess()
+    }
+    setPaying(false)
+  }
+
+  return (
+    <form onSubmit={handleSubmit}>
+      <PaymentElement options={{ layout: 'tabs' }} />
+      <button
+        type="submit"
+        disabled={!stripe || paying}
+        style={{ ...s.btnPrimary, width: '100%', marginTop: 16, opacity: paying ? .7 : 1 }}
+      >
+        {paying ? 'Procesando…' : 'Confirmar pago'}
+      </button>
+    </form>
+  )
 }
 
+// ── Página principal ───────────────────────────────────────────
 export function PaginaPago() {
-  const { invoiceId }        = useParams()
-  const [params]             = useSearchParams()
-  const [info, setInfo]      = useState(null)
-  const [loading, setLoading] = useState(true)
-  const [step, setStep]      = useState('main') // main | uploading | success | error
-  const [msg, setMsg]        = useState('')
+  const { invoiceId }           = useParams()
+  const [params]                = useSearchParams()
+  const [info, setInfo]         = useState(null)
+  const [loading, setLoading]   = useState(true)
+  const [screen, setScreen]     = useState('main')   // main | bank | stripe | uploading | success | error
+  const [msg, setMsg]           = useState('')
   const [mpLoading, setMpLoading] = useState(false)
-  const fileRef              = useRef()
+  const [stripePromise, setStripePromise] = useState(null)
+  const [clientSecret, setClientSecret]   = useState(null)
+  const fileRef = useRef()
 
+  // Cargar info de la factura
   useEffect(() => {
     fetch(`${SUPABASE_URL}/functions/v1/get-payment-info?id=${invoiceId}`, {
       headers: { apikey: SUPABASE_ANON_KEY },
@@ -43,375 +80,315 @@ export function PaginaPago() {
       .catch(() => setLoading(false))
   }, [invoiceId])
 
-  // Llegó de vuelta desde MercadoPago
+  // Redirigido de vuelta desde MercadoPago
   useEffect(() => {
     const status = params.get('status')
-    if (status === 'success') {
-      setStep('success')
-      setMsg('¡Pago confirmado! Tu pago fue procesado correctamente.')
-    } else if (status === 'failure') {
-      setStep('error')
-      setMsg('El pago no fue procesado. Podés intentarlo de nuevo o usar otro método.')
-    } else if (status === 'pending') {
-      setStep('success')
-      setMsg('Pago en proceso. Te avisaremos cuando se confirme.')
-    }
+    if (status === 'success') { setScreen('success'); setMsg('¡Pago confirmado! Tu pago fue procesado correctamente.') }
+    else if (status === 'failure') { setScreen('error'); setMsg('El pago no se procesó. Podés intentarlo de nuevo o usar otro método.') }
+    else if (status === 'pending') { setScreen('success'); setMsg('Pago en proceso. Te avisaremos cuando se confirme.') }
   }, [params])
 
+  // ── Iniciar MercadoPago ──────────────────────────────────────
   async function handleMercadoPago() {
     setMpLoading(true)
     try {
       const data = await callFn('create-mp-preference', {
-        method: 'POST',
-        body: JSON.stringify({ invoiceId }),
+        method: 'POST', body: JSON.stringify({ invoiceId }),
       })
-      if (data.error) { setStep('error'); setMsg(data.error); return }
-      // En producción usar initPoint, en test sandboxUrl
-      const url = data.initPoint ?? data.sandboxUrl
-      window.location.href = url
+      if (data.error) { setScreen('error'); setMsg(data.error); return }
+      window.location.href = data.initPoint ?? data.sandboxUrl
     } catch {
-      setStep('error')
-      setMsg('No se pudo conectar con MercadoPago. Intentá de nuevo.')
-    } finally {
-      setMpLoading(false)
-    }
+      setScreen('error'); setMsg('No se pudo conectar con MercadoPago.')
+    } finally { setMpLoading(false) }
   }
 
+  // ── Iniciar Stripe ───────────────────────────────────────────
+  async function handleStripe() {
+    if (!info?.stripePk) return
+    setScreen('stripe')
+    if (!stripePromise) setStripePromise(loadStripe(info.stripePk))
+    const data = await callFn('create-stripe-intent', {
+      method: 'POST', body: JSON.stringify({ invoiceId }),
+    })
+    if (data.error) { setScreen('error'); setMsg(data.error); return }
+    setClientSecret(data.clientSecret)
+  }
+
+  // ── Subir comprobante ────────────────────────────────────────
   async function handleFileUpload(e) {
     const file = e.target.files?.[0]
     if (!file) return
-
-    setStep('uploading')
+    setScreen('uploading')
     try {
       const fd = new FormData()
       fd.append('invoiceId', invoiceId)
       fd.append('file', file)
-
       const res = await fetch(`${SUPABASE_URL}/functions/v1/upload-receipt`, {
         method: 'POST',
         headers: { apikey: SUPABASE_ANON_KEY },
         body: fd,
       })
       const data = await res.json()
-
       if (data.ok) {
-        setStep('success')
-        setMsg(data.message ?? '¡Comprobante recibido! Quedó registrado.')
+        setScreen('success')
+        setMsg(data.message ?? '¡Comprobante recibido y verificado!')
         setInfo(prev => prev ? { ...prev, status: 'paid' } : prev)
       } else {
-        setStep('error')
-        setMsg(data.message ?? 'No pudimos verificar el comprobante. Intentá con otra imagen.')
+        setScreen('error')
+        setMsg(data.message ?? 'No pudimos verificar el comprobante. Intentá con una imagen más clara.')
       }
     } catch {
-      setStep('error')
-      setMsg('Error al subir el archivo. Intentá de nuevo.')
+      setScreen('error'); setMsg('Error al subir. Intentá de nuevo.')
     }
   }
 
-  if (loading) {
-    return (
-      <div style={styles.page}>
-        <div style={styles.card}>
-          <div style={styles.spinner} />
-          <p style={{ color: '#888', fontSize: 14, marginTop: 16 }}>Cargando...</p>
-        </div>
-      </div>
-    )
-  }
+  // ── Renders de estados ───────────────────────────────────────
+  if (loading) return <Shell><Spinner /><p style={s.muted}>Cargando...</p></Shell>
 
-  if (!info || info.error) {
-    return (
-      <div style={styles.page}>
-        <div style={styles.card}>
-          <div style={{ fontSize: 40, marginBottom: 12 }}>😕</div>
-          <h2 style={styles.title}>Factura no encontrada</h2>
-          <p style={{ color: '#888', fontSize: 14 }}>El link puede haber expirado o ser incorrecto.</p>
-        </div>
-      </div>
-    )
-  }
+  if (!info || info.error) return (
+    <Shell>
+      <div style={{ fontSize: 40, marginBottom: 12 }}>😕</div>
+      <h2 style={s.title}>Factura no encontrada</h2>
+      <p style={s.muted}>El link puede haber expirado o ser incorrecto.</p>
+    </Shell>
+  )
 
-  // ── Pantalla de éxito ──────────────────────────────────────
-  if (step === 'success') {
-    return (
-      <div style={styles.page}>
-        <div style={styles.card}>
-          <div style={{ fontSize: 56, marginBottom: 8 }}>✅</div>
-          <h2 style={styles.title}>¡Listo!</h2>
-          <p style={{ color: '#888', fontSize: 14, textAlign: 'center', lineHeight: 1.6 }}>{msg}</p>
-          <div style={{ marginTop: 24, padding: '12px 16px', background: '#f0fdf4', borderRadius: 8, border: '1px solid #86efac' }}>
-            <p style={{ margin: 0, fontSize: 12, color: '#16a34a', textAlign: 'center' }}>
-              Factura <strong>{info.cfeId}</strong> — <strong>{info.company}</strong>
-            </p>
+  if (screen === 'success') return (
+    <Shell>
+      <div style={{ fontSize: 56, marginBottom: 8 }}>✅</div>
+      <h2 style={s.title}>¡Listo!</h2>
+      <p style={{ ...s.muted, textAlign: 'center' }}>{msg}</p>
+      <div style={{ marginTop: 20, padding: '12px 16px', background: '#f0fdf4', borderRadius: 10, border: '1px solid #86efac', width: '100%' }}>
+        <p style={{ margin: 0, fontSize: 12, color: '#16a34a', textAlign: 'center' }}>
+          Factura <strong>{info.cfeId}</strong> — <strong>{info.company}</strong>
+        </p>
+      </div>
+    </Shell>
+  )
+
+  if (screen === 'error') return (
+    <Shell>
+      <div style={{ fontSize: 48, marginBottom: 8 }}>⚠️</div>
+      <h2 style={s.title}>Algo salió mal</h2>
+      <p style={{ ...s.muted, textAlign: 'center' }}>{msg}</p>
+      <button style={{ ...s.btnOutline, marginTop: 20 }} onClick={() => setScreen('main')}>← Volver</button>
+    </Shell>
+  )
+
+  if (screen === 'uploading') return (
+    <Shell><Spinner /><p style={{ ...s.muted, marginTop: 16 }}>Verificando comprobante con IA…</p></Shell>
+  )
+
+  // ── Pantalla Stripe embebida ─────────────────────────────────
+  if (screen === 'stripe') return (
+    <Shell wide>
+      <InvoiceCard info={info} />
+      <button style={{ ...s.btnOutline, marginBottom: 16, alignSelf: 'flex-start' }} onClick={() => setScreen('main')}>← Volver</button>
+      {clientSecret && stripePromise ? (
+        <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: 'night' } }}>
+          <StripeForm
+            onSuccess={() => { setScreen('success'); setMsg('¡Pago con tarjeta confirmado!'); setInfo(i => ({ ...i, status: 'paid' })) }}
+            onError={err => { setScreen('error'); setMsg(err) }}
+          />
+        </Elements>
+      ) : (
+        <div style={{ textAlign: 'center' }}><Spinner /><p style={s.muted}>Preparando checkout…</p></div>
+      )}
+    </Shell>
+  )
+
+  // ── Pantalla Transferencia bancaria ──────────────────────────
+  if (screen === 'bank') return (
+    <Shell>
+      <button style={{ ...s.btnOutline, marginBottom: 16, alignSelf: 'flex-start' }} onClick={() => setScreen('main')}>← Volver</button>
+      <InvoiceCard info={info} />
+      <div style={s.bankBox}>
+        <div style={s.bankTitle}>🏦 Datos para transferencia</div>
+        {info.bankName    && <BankRow label="Banco"   value={info.bankName} />}
+        {info.bankAccount && <BankRow label="Cuenta"  value={info.bankAccount} copy />}
+        {info.bankAlias   && <BankRow label="Alias"   value={info.bankAlias}   copy />}
+        {info.paymentInstructions && (
+          <div style={{ marginTop: 12, fontSize: 13, color: '#ccc', lineHeight: 1.7, whiteSpace: 'pre-line', borderTop: '1px solid #333', paddingTop: 12 }}>
+            {info.paymentInstructions}
           </div>
-        </div>
+        )}
       </div>
-    )
-  }
 
-  // ── Pantalla de error ──────────────────────────────────────
-  if (step === 'error') {
-    return (
-      <div style={styles.page}>
-        <div style={styles.card}>
-          <div style={{ fontSize: 48, marginBottom: 8 }}>⚠️</div>
-          <h2 style={styles.title}>Algo salió mal</h2>
-          <p style={{ color: '#888', fontSize: 14, textAlign: 'center', lineHeight: 1.6 }}>{msg}</p>
-          <button style={{ ...styles.btnPrimary, marginTop: 20 }} onClick={() => setStep('main')}>
-            Volver a intentar
-          </button>
-        </div>
-      </div>
-    )
-  }
+      <p style={{ ...s.muted, marginTop: 16, textAlign: 'center' }}>
+        Una vez que transferiste, subí el comprobante:
+      </p>
+      <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleFileUpload} />
+      <button style={{ ...s.btnReceipt, marginTop: 8 }} onClick={() => fileRef.current?.click()}>
+        📎 Subir comprobante de pago
+      </button>
+    </Shell>
+  )
 
-  // ── Cargando comprobante ───────────────────────────────────
-  if (step === 'uploading') {
-    return (
-      <div style={styles.page}>
-        <div style={styles.card}>
-          <div style={styles.spinner} />
-          <p style={{ color: '#888', fontSize: 14, marginTop: 16, textAlign: 'center' }}>
-            Analizando comprobante con IA…
-          </p>
-        </div>
-      </div>
-    )
-  }
-
+  // ── Pantalla principal ───────────────────────────────────────
   const isPaid = info.status === 'paid'
+  const hasAnyMethod = info.hasMercadoPago || info.hasStripe || info.hasBankTransfer
 
-  // ── Página principal ───────────────────────────────────────
   return (
-    <div style={styles.page}>
-      <div style={styles.card}>
-
-        {/* Negocio */}
-        <div style={styles.businessHeader}>
-          <div style={styles.businessInitials}>
-            {(info.company || 'N').slice(0, 2).toUpperCase()}
-          </div>
-          <div>
-            <div style={styles.businessName}>{info.company}</div>
-            <div style={styles.businessLabel}>te envía esta factura</div>
-          </div>
+    <Shell>
+      {/* Negocio */}
+      <div style={s.bizRow}>
+        <div style={s.bizInitials}>{(info.company || 'N').slice(0,2).toUpperCase()}</div>
+        <div>
+          <div style={s.bizName}>{info.company}</div>
+          <div style={s.bizSub}>te envía esta factura</div>
         </div>
+      </div>
 
-        {/* Monto */}
-        <div style={styles.amountBox}>
-          <div style={styles.amountLabel}>Total a pagar</div>
-          <div style={styles.amount}>${fmt(info.amount)}<span style={styles.currency}> UYU</span></div>
-          <div style={styles.invoiceRef}>Factura {info.cfeId} · Vence {info.due}</div>
-          {isPaid && (
-            <div style={{ marginTop: 10, padding: '6px 14px', background: '#f0fdf4', borderRadius: 20, display: 'inline-block' }}>
-              <span style={{ color: '#16a34a', fontSize: 13, fontWeight: 600 }}>✓ Pagada</span>
-            </div>
-          )}
-        </div>
+      {/* Monto */}
+      <InvoiceCard info={info} />
 
-        {!isPaid && (
-          <>
-            {/* Instrucciones de transferencia */}
-            {info.paymentInstructions && (
-              <div style={styles.transferBox}>
-                <div style={styles.transferTitle}>🏦 Datos para transferencia</div>
-                <div style={styles.transferText}>{info.paymentInstructions}</div>
-              </div>
+      {isPaid && <p style={{ ...s.muted, textAlign: 'center' }}>Esta factura ya fue abonada. ¡Gracias! 🙌</p>}
+
+      {!isPaid && hasAnyMethod && (
+        <>
+          <p style={{ fontSize: 11, color: '#555', textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 10, alignSelf: 'flex-start' }}>Elegí cómo pagar</p>
+
+          <div style={s.methods}>
+            {/* MercadoPago */}
+            {info.hasMercadoPago && (
+              <button style={{ ...s.methodBtn, background: '#009ee3', color: '#fff', opacity: mpLoading ? .7 : 1 }}
+                onClick={handleMercadoPago} disabled={mpLoading}>
+                <span style={s.methodIcon}>💳</span>
+                <div style={{ flex: 1, textAlign: 'left' }}>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>MercadoPago</div>
+                  <div style={{ fontSize: 11, opacity: .8 }}>Tarjeta · Saldo MP · Cuotas</div>
+                </div>
+                <span style={s.arrow}>›</span>
+              </button>
             )}
 
-            <div style={styles.divider}><span>O pagá directamente</span></div>
-
-            {/* Botones de pago */}
-            <div style={styles.actions}>
-
-              {/* MercadoPago */}
-              {info.hasMercadoPago && (
-                <button
-                  style={{ ...styles.btnMP, opacity: mpLoading ? .7 : 1 }}
-                  onClick={handleMercadoPago}
-                  disabled={mpLoading}
-                >
-                  <img src="https://http2.mlstatic.com/frontend-assets/mp-web-navigation/ui-navigation/5.21.22/mercadopago/logo__large@2x.png"
-                    alt="MercadoPago" height={22} style={{ filter: 'brightness(0) invert(1)' }} />
-                  {mpLoading ? 'Redirigiendo…' : 'Pagar con MercadoPago'}
-                </button>
-              )}
-
-              {/* Subir comprobante */}
-              <input
-                ref={fileRef}
-                type="file"
-                accept="image/*"
-                capture="environment"
-                style={{ display: 'none' }}
-                onChange={handleFileUpload}
-              />
-              <button style={styles.btnReceipt} onClick={() => fileRef.current?.click()}>
-                📎 Ya pagué — subir comprobante
+            {/* Stripe / Apple Pay / Google Pay */}
+            {info.hasStripe && (
+              <button style={{ ...s.methodBtn, background: '#635bff', color: '#fff' }}
+                onClick={handleStripe}>
+                <span style={s.methodIcon}> </span>
+                <div style={{ flex: 1, textAlign: 'left' }}>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>Apple Pay · Google Pay · Tarjeta</div>
+                  <div style={{ fontSize: 11, opacity: .8 }}>Pago seguro con Stripe</div>
+                </div>
+                <span style={s.arrow}>›</span>
               </button>
-            </div>
+            )}
 
-            <p style={styles.footer}>
-              La verificación del comprobante es automática por IA.
-            </p>
-          </>
-        )}
+            {/* Transferencia bancaria */}
+            {info.hasBankTransfer && (
+              <button style={s.methodBtn} onClick={() => setScreen('bank')}>
+                <span style={s.methodIcon}>🏦</span>
+                <div style={{ flex: 1, textAlign: 'left' }}>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: '#fff' }}>Transferencia bancaria</div>
+                  <div style={{ fontSize: 11, color: '#888' }}>{info.bankName || 'Ver datos de cuenta'}</div>
+                </div>
+                <span style={{ ...s.arrow, color: '#888' }}>›</span>
+              </button>
+            )}
 
-        {isPaid && (
-          <p style={{ textAlign: 'center', color: '#888', fontSize: 13, marginTop: 8 }}>
-            Esta factura ya fue abonada. ¡Gracias!
-          </p>
-        )}
+            {/* Subir comprobante (siempre disponible si hay métodos) */}
+            <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleFileUpload} />
+            <button style={s.btnReceipt} onClick={() => fileRef.current?.click()}>
+              📎 Ya pagué — subir comprobante
+            </button>
+          </div>
+
+          <p style={s.footerNote}>La verificación del comprobante es automática por IA.</p>
+        </>
+      )}
+
+      {!isPaid && !hasAnyMethod && (
+        <>
+          <input ref={fileRef} type="file" accept="image/*" capture="environment" style={{ display: 'none' }} onChange={handleFileUpload} />
+          <button style={s.btnReceipt} onClick={() => fileRef.current?.click()}>
+            📎 Ya pagué — subir comprobante
+          </button>
+        </>
+      )}
+    </Shell>
+  )
+}
+
+// ── Sub-componentes ────────────────────────────────────────────
+function Shell({ children, wide }) {
+  return (
+    <div style={s.page}>
+      <div style={{ ...s.card, maxWidth: wide ? 520 : 400 }}>
+        {children}
       </div>
-
-      {/* Powered by */}
-      <p style={{ textAlign: 'center', color: '#555', fontSize: 11, marginTop: 20 }}>
-        Powered by <strong>Cobraya</strong>
+      <p style={{ textAlign: 'center', color: '#333', fontSize: 11, marginTop: 16 }}>
+        Powered by <strong style={{ color: '#555' }}>Cobraya</strong>
       </p>
     </div>
   )
 }
 
+function Spinner() {
+  return <div style={s.spinner} />
+}
+
+function InvoiceCard({ info }) {
+  return (
+    <div style={s.amountBox}>
+      <div style={s.amountLabel}>Total a pagar</div>
+      <div style={s.amount}>${fmt(info.amount)}<span style={s.currency}> UYU</span></div>
+      <div style={s.invoiceRef}>Factura {info.cfeId} · Vence {info.due}</div>
+      {info.status === 'paid' && (
+        <div style={{ marginTop: 10 }}>
+          <span style={{ background: '#f0fdf4', color: '#16a34a', borderRadius: 20, padding: '4px 14px', fontSize: 13, fontWeight: 600 }}>✓ Pagada</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function BankRow({ label, value, copy }) {
+  const [copied, setCopied] = useState(false)
+  function handleCopy() {
+    navigator.clipboard.writeText(value)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+  return (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #222' }}>
+      <span style={{ fontSize: 11, color: '#666' }}>{label}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span style={{ fontSize: 13, color: '#ddd', fontFamily: 'monospace' }}>{value}</span>
+        {copy && (
+          <button onClick={handleCopy} style={{ background: 'none', border: '1px solid #333', borderRadius: 4, padding: '2px 8px', color: copied ? '#22c55e' : '#888', fontSize: 10, cursor: 'pointer' }}>
+            {copied ? '✓' : 'Copiar'}
+          </button>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Estilos ────────────────────────────────────────────────────
-const styles = {
-  page: {
-    minHeight: '100vh',
-    background: '#0a0a0a',
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '24px 16px',
-    fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
-  },
-  card: {
-    background: '#111',
-    border: '1px solid #222',
-    borderRadius: 20,
-    padding: '28px 24px',
-    width: '100%',
-    maxWidth: 400,
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-  },
-  spinner: {
-    width: 32,
-    height: 32,
-    borderRadius: '50%',
-    border: '2px solid #333',
-    borderTopColor: '#22c55e',
-    animation: 'spin .7s linear infinite',
-  },
-  businessHeader: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: 12,
-    width: '100%',
-    marginBottom: 24,
-  },
-  businessInitials: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    background: '#1a1a1a',
-    border: '1px solid #333',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: 16,
-    fontWeight: 700,
-    color: '#fff',
-    flexShrink: 0,
-  },
-  businessName: { fontSize: 16, fontWeight: 700, color: '#fff' },
-  businessLabel: { fontSize: 12, color: '#666', marginTop: 2 },
-  amountBox: {
-    width: '100%',
-    background: '#0d0d0d',
-    border: '1px solid #1e1e1e',
-    borderRadius: 16,
-    padding: '24px 20px',
-    textAlign: 'center',
-    marginBottom: 20,
-  },
-  amountLabel: { fontSize: 11, color: '#555', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 },
-  amount: { fontSize: 42, fontWeight: 800, color: '#fff', letterSpacing: '-1px' },
-  currency: { fontSize: 18, fontWeight: 400, color: '#666' },
-  invoiceRef: { fontSize: 12, color: '#555', marginTop: 8 },
-  transferBox: {
-    width: '100%',
-    background: '#0d1117',
-    border: '1px solid #1a2332',
-    borderRadius: 12,
-    padding: '16px',
-    marginBottom: 16,
-  },
-  transferTitle: { fontSize: 12, fontWeight: 700, color: '#60a5fa', marginBottom: 8 },
-  transferText: { fontSize: 13, color: '#ccc', lineHeight: 1.7, whiteSpace: 'pre-line' },
-  divider: {
-    width: '100%',
-    textAlign: 'center',
-    borderTop: '1px solid #222',
-    marginBottom: 16,
-    position: 'relative',
-    '& span': {
-      background: '#111',
-      padding: '0 10px',
-      fontSize: 11,
-      color: '#555',
-      position: 'relative',
-      top: -9,
-    },
-  },
-  actions: {
-    width: '100%',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 10,
-  },
-  btnMP: {
-    width: '100%',
-    background: '#009ee3',
-    border: 'none',
-    borderRadius: 12,
-    padding: '15px',
-    color: '#fff',
-    fontSize: 15,
-    fontWeight: 700,
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  btnReceipt: {
-    width: '100%',
-    background: 'transparent',
-    border: '1px solid #333',
-    borderRadius: 12,
-    padding: '15px',
-    color: '#ccc',
-    fontSize: 14,
-    fontWeight: 600,
-    cursor: 'pointer',
-  },
-  btnPrimary: {
-    background: '#22c55e',
-    border: 'none',
-    borderRadius: 12,
-    padding: '14px 28px',
-    color: '#000',
-    fontSize: 15,
-    fontWeight: 700,
-    cursor: 'pointer',
-  },
-  title: { fontSize: 22, fontWeight: 800, color: '#fff', marginBottom: 8 },
-  footer: {
-    fontSize: 11,
-    color: '#444',
-    textAlign: 'center',
-    marginTop: 16,
-    lineHeight: 1.5,
-  },
+const s = {
+  page:        { minHeight: '100vh', background: '#080808', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px 16px', fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif' },
+  card:        { background: '#111', border: '1px solid #1e1e1e', borderRadius: 20, padding: '28px 24px', width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 },
+  spinner:     { width: 32, height: 32, borderRadius: '50%', border: '2px solid #333', borderTopColor: '#22c55e', animation: 'spin .7s linear infinite' },
+  muted:       { color: '#666', fontSize: 14, margin: 0 },
+  title:       { fontSize: 22, fontWeight: 800, color: '#fff', margin: '0 0 8px' },
+  bizRow:      { display: 'flex', alignItems: 'center', gap: 12, width: '100%', marginBottom: 16 },
+  bizInitials: { width: 40, height: 40, borderRadius: 10, background: '#1a1a1a', border: '1px solid #2a2a2a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 700, color: '#fff', flexShrink: 0 },
+  bizName:     { fontSize: 15, fontWeight: 700, color: '#fff' },
+  bizSub:      { fontSize: 11, color: '#555', marginTop: 2 },
+  amountBox:   { width: '100%', background: '#0d0d0d', border: '1px solid #1a1a1a', borderRadius: 14, padding: '22px 20px', textAlign: 'center', marginBottom: 8 },
+  amountLabel: { fontSize: 10, color: '#444', textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 8 },
+  amount:      { fontSize: 40, fontWeight: 800, color: '#fff', letterSpacing: '-1px' },
+  currency:    { fontSize: 16, fontWeight: 400, color: '#555' },
+  invoiceRef:  { fontSize: 12, color: '#444', marginTop: 6 },
+  methods:     { display: 'flex', flexDirection: 'column', gap: 8, width: '100%', marginTop: 4 },
+  methodBtn:   { width: '100%', background: '#1a1a1a', border: '1px solid #2a2a2a', borderRadius: 12, padding: '14px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 12 },
+  methodIcon:  { fontSize: 22, flexShrink: 0 },
+  arrow:       { fontSize: 22, color: 'rgba(255,255,255,.4)' },
+  btnReceipt:  { width: '100%', background: 'transparent', border: '1px solid #2a2a2a', borderRadius: 12, padding: '14px', color: '#888', fontSize: 13, fontWeight: 600, cursor: 'pointer', marginTop: 4 },
+  btnOutline:  { background: 'transparent', border: '1px solid #333', borderRadius: 8, padding: '8px 16px', color: '#888', fontSize: 13, cursor: 'pointer' },
+  btnPrimary:  { background: '#635bff', border: 'none', borderRadius: 10, padding: '14px 24px', color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer' },
+  bankBox:     { width: '100%', background: '#0d0d0d', border: '1px solid #1a1a1a', borderRadius: 12, padding: '16px', marginTop: 4 },
+  bankTitle:   { fontSize: 12, fontWeight: 700, color: '#60a5fa', marginBottom: 12 },
+  footerNote:  { fontSize: 11, color: '#333', marginTop: 12, textAlign: 'center' },
 }
