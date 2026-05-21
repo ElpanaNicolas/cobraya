@@ -77,7 +77,9 @@ const DEMO_INFO = {
 
 // ── Página principal ───────────────────────────────────────────
 export function PaginaPago() {
-  const { invoiceId }           = useParams()
+  // useParams() no funciona fuera de <Routes> — extraemos el ID de la URL directamente
+  const { invoiceId: routeId }  = useParams()
+  const invoiceId               = routeId || window.location.pathname.split('/pagar/')[1]?.split('/')[0] || ''
   const isDemo                  = invoiceId === 'demo'
   const [params]                = useSearchParams()
   const [info, setInfo]         = useState(isDemo ? DEMO_INFO : null)
