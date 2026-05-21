@@ -39,6 +39,11 @@ export const api = {
       bankAlias:            data.bank_alias            ?? '',
       stripePk:             data.stripe_pk             ?? '',
       stripeSk:             data.stripe_sk             ?? '',
+      waProvider:           data.wa_provider           ?? 'twilio',
+      metaPhoneNumberId:    data.meta_phone_number_id  ?? '',
+      metaAccessToken:      data.meta_access_token     ?? '',
+      metaWabaId:           data.meta_waba_id          ?? '',
+      metaVerifyToken:      data.meta_verify_token     ?? '',
     }
   },
 
@@ -391,24 +396,30 @@ export const api = {
   async saveProfile({ company, twilioAccountSid, twilioAuthToken, twilioWaNumber,
                       paymentInstructions, mpAccessToken,
                       bankName, bankAccount, bankAlias,
-                      stripePk, stripeSk }) {
+                      stripePk, stripeSk,
+                      waProvider, metaPhoneNumberId, metaAccessToken, metaWabaId, metaVerifyToken }) {
     const { data: { user } } = await supabase.auth.getUser()
     const t = v => (v ?? '').trim()
     const { error } = await supabase
       .from('profiles')
       .update({
         company,
-        ...(twilioAccountSid    !== undefined && { twilio_account_sid:   t(twilioAccountSid)   }),
-        ...(twilioAuthToken     !== undefined && { twilio_auth_token:    t(twilioAuthToken)    }),
-        ...(twilioWaNumber      !== undefined && { twilio_wa_number:     t(twilioWaNumber),
-                                                   whatsapp:             t(twilioWaNumber)     }),
-        ...(paymentInstructions !== undefined && { payment_instructions: t(paymentInstructions) }),
-        ...(mpAccessToken       !== undefined && { mp_access_token:      t(mpAccessToken)      }),
-        ...(bankName            !== undefined && { bank_name:            t(bankName)            }),
-        ...(bankAccount         !== undefined && { bank_account:         t(bankAccount)         }),
-        ...(bankAlias           !== undefined && { bank_alias:           t(bankAlias)           }),
-        ...(stripePk            !== undefined && { stripe_pk:            t(stripePk)            }),
-        ...(stripeSk            !== undefined && { stripe_sk:            t(stripeSk)            }),
+        ...(twilioAccountSid    !== undefined && { twilio_account_sid:    t(twilioAccountSid)   }),
+        ...(twilioAuthToken     !== undefined && { twilio_auth_token:     t(twilioAuthToken)    }),
+        ...(twilioWaNumber      !== undefined && { twilio_wa_number:      t(twilioWaNumber),
+                                                   whatsapp:              t(twilioWaNumber)     }),
+        ...(paymentInstructions !== undefined && { payment_instructions:  t(paymentInstructions) }),
+        ...(mpAccessToken       !== undefined && { mp_access_token:       t(mpAccessToken)      }),
+        ...(bankName            !== undefined && { bank_name:             t(bankName)            }),
+        ...(bankAccount         !== undefined && { bank_account:          t(bankAccount)         }),
+        ...(bankAlias           !== undefined && { bank_alias:            t(bankAlias)           }),
+        ...(stripePk            !== undefined && { stripe_pk:             t(stripePk)            }),
+        ...(stripeSk            !== undefined && { stripe_sk:             t(stripeSk)            }),
+        ...(waProvider          !== undefined && { wa_provider:           waProvider             }),
+        ...(metaPhoneNumberId   !== undefined && { meta_phone_number_id:  t(metaPhoneNumberId)  }),
+        ...(metaAccessToken     !== undefined && { meta_access_token:     t(metaAccessToken)    }),
+        ...(metaWabaId          !== undefined && { meta_waba_id:          t(metaWabaId)         }),
+        ...(metaVerifyToken     !== undefined && { meta_verify_token:     t(metaVerifyToken)    }),
       })
       .eq('id', user.id)
     check(error)

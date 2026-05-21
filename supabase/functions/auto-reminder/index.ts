@@ -8,6 +8,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { callClaude } from '../_shared/claude.ts'
 import { sendEmail, reminderEmailHtml } from '../_shared/resend.ts'
+import { sendMetaWhatsApp } from '../_shared/meta-whatsapp.ts'
 
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL')!,
@@ -59,7 +60,7 @@ serve(async (req) => {
     // ── 1. Obtener todos los perfiles con agente activo ──────
     const { data: configs } = await supabase
       .from('agent_config')
-      .select('*, profiles(id, company, signature, twilio_account_sid, twilio_auth_token, twilio_wa_number)')
+      .select('*, profiles(id, company, signature, twilio_account_sid, twilio_auth_token, twilio_wa_number, wa_provider, meta_phone_number_id, meta_access_token)')
       .eq('enabled', true)
 
     for (const cfg of configs ?? []) {
@@ -73,6 +74,7 @@ serve(async (req) => {
         continue
       }
 
+      const waProvider  = profile.wa_provider ?? 'twilio'
       const twilioSid   = profile.twilio_account_sid || Deno.env.get('TWILIO_ACCOUNT_SID')!
       const twilioToken = profile.twilio_auth_token  || Deno.env.get('TWILIO_AUTH_TOKEN')!
       const twilioFrom  = profile.twilio_wa_number   || Deno.env.get('TWILIO_WHATSAPP_NUMBER')!
@@ -143,7 +145,11 @@ serve(async (req) => {
 
           // WhatsApp
           if (cfg.channel_whatsapp !== false) {
-            await sendWhatsApp(client.phone, msg, twilioSid, twilioToken, twilioFrom)
+            if (waProvider === 'meta' && profile.meta_phone_number_id && profile.meta_access_token) {
+              await sendMetaWhatsApp(client.phone, msg, profile.meta_phone_number_id, profile.meta_access_token)
+            } else {
+              await sendWhatsApp(client.phone, msg, twilioSid, twilioToken, twilioFrom)
+            }
           }
 
           // Email
@@ -232,7 +238,11 @@ serve(async (req) => {
 
           // WhatsApp
           if (cfg.channel_whatsapp !== false) {
-            await sendWhatsApp(client.phone, msg, twilioSid, twilioToken, twilioFrom)
+            if (waProvider === 'meta' && profile.meta_phone_number_id && profile.meta_access_token) {
+              await sendMetaWhatsApp(client.phone, msg, profile.meta_phone_number_id, profile.meta_access_token)
+            } else {
+              await sendWhatsApp(client.phone, msg, twilioSid, twilioToken, twilioFrom)
+            }
           }
 
           // Email

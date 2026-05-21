@@ -8,6 +8,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { callClaude }   from '../_shared/claude.ts'
 import { sendEmail, reminderEmailHtml } from '../_shared/resend.ts'
 import { corsHeaders, handleCors } from '../_shared/cors.ts'
+import { sendMetaWhatsApp } from '../_shared/meta-whatsapp.ts'
 
 serve(async (req) => {
   const corsResponse = handleCors(req)
@@ -38,7 +39,7 @@ serve(async (req) => {
     // ── Config del agente y perfil ───────────────────────────
     const [{ data: agentCfg }, { data: profile }] = await Promise.all([
       supabase.from('agent_config').select('*').eq('profile_id', user.id).single(),
-      supabase.from('profiles').select('company, signature, twilio_account_sid, twilio_auth_token, twilio_wa_number').eq('id', user.id).single(),
+      supabase.from('profiles').select('company, signature, twilio_account_sid, twilio_auth_token, twilio_wa_number, wa_provider, meta_phone_number_id, meta_access_token').eq('id', user.id).single(),
     ])
 
     const toneMap: Record<string, string> = {
@@ -98,28 +99,27 @@ serve(async (req) => {
     const channels = { whatsapp: false, email: false }
 
     // ── Canal WhatsApp ───────────────────────────────────────
-    const clientPhone = invoice.clients?.phone
-    const twilioSid   = profile?.twilio_account_sid || Deno.env.get('TWILIO_ACCOUNT_SID')
-    const twilioToken = profile?.twilio_auth_token  || Deno.env.get('TWILIO_AUTH_TOKEN')
-    const twilioFrom  = profile?.twilio_wa_number   || Deno.env.get('TWILIO_WHATSAPP_NUMBER')
+    const clientPhone  = invoice.clients?.phone
+    const waProvider   = profile?.wa_provider ?? 'twilio'
 
-    if (clientPhone && twilioSid && twilioToken && twilioFrom && agentCfg?.channel_whatsapp !== false) {
+    if (clientPhone && agentCfg?.channel_whatsapp !== false) {
       try {
-        await fetch(
-          `https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`,
-          {
-            method: 'POST',
-            headers: {
-              Authorization: `Basic ${btoa(`${twilioSid}:${twilioToken}`)}`,
-              'Content-Type': 'application/x-www-form-urlencoded',
-            },
-            body: new URLSearchParams({
-              From: `whatsapp:${twilioFrom}`,
-              To:   `whatsapp:${clientPhone}`,
-              Body: messageBody,
-            }),
+        if (waProvider === 'meta' && profile?.meta_phone_number_id && profile?.meta_access_token) {
+          // ── Meta WhatsApp Cloud API ──
+          await sendMetaWhatsApp(clientPhone, messageBody, profile.meta_phone_number_id, profile.meta_access_token)
+        } else {
+          // ── Twilio (default) ──
+          const twilioSid   = profile?.twilio_account_sid || Deno.env.get('TWILIO_ACCOUNT_SID')
+          const twilioToken = profile?.twilio_auth_token  || Deno.env.get('TWILIO_AUTH_TOKEN')
+          const twilioFrom  = profile?.twilio_wa_number   || Deno.env.get('TWILIO_WHATSAPP_NUMBER')
+          if (twilioSid && twilioToken && twilioFrom) {
+            await fetch(`https://api.twilio.com/2010-04-01/Accounts/${twilioSid}/Messages.json`, {
+              method: 'POST',
+              headers: { Authorization: `Basic ${btoa(`${twilioSid}:${twilioToken}`)}`, 'Content-Type': 'application/x-www-form-urlencoded' },
+              body: new URLSearchParams({ From: `whatsapp:${twilioFrom}`, To: `whatsapp:${clientPhone}`, Body: messageBody }),
+            })
           }
-        )
+        }
         channels.whatsapp = true
       } catch (err) {
         console.error('WhatsApp send error:', err)

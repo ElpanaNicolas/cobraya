@@ -107,6 +107,11 @@ export function Configuracion() {
     bankAccount:         user.bankAccount         ?? '',
     bankAlias:           user.bankAlias           ?? '',
     stripePk:            user.stripePk            ?? '',
+    waProvider:          user.waProvider          ?? 'twilio',
+    metaPhoneNumberId:   user.metaPhoneNumberId   ?? '',
+    metaAccessToken:     user.metaAccessToken     ?? '',
+    metaWabaId:          user.metaWabaId          ?? '',
+    metaVerifyToken:     user.metaVerifyToken      ?? '',
     stripeSk:            user.stripeSk            ?? '',
   })
 
@@ -250,50 +255,85 @@ export function Configuracion() {
         </div>
       </Section>
 
-      {/* Twilio */}
-      <Section title="Conexión WhatsApp" subtitle="Credenciales de tu cuenta Twilio — cada negocio usa su propio número">
-        <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(91,196,232,0.07)', border: '1px solid rgba(91,196,232,0.2)', marginBottom: 16, fontSize: 11, color: 'var(--muted)', lineHeight: 1.6 }}>
-          <span style={{ color: '#5bc4e8', fontWeight: 700, fontFamily: 'var(--font-ui)' }}>¿Cómo conseguir estas credenciales?</span>
-          {' '}Crear cuenta en{' '}
-          <a href="https://twilio.com" target="_blank" rel="noreferrer" style={{ color: '#5bc4e8' }}>twilio.com</a>
-          {' '}→ Console → Account Info. El número debe tener WhatsApp habilitado.
-        </div>
-        <div className="config-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-          <Field label="Account SID" hint="Empieza con AC...">
-            <Input
-              value={profile?.twilioAccountSid ?? ''}
-              onChange={e => setProfile(p => ({ ...p, twilioAccountSid: e.target.value }))}
-              placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-            />
-          </Field>
-          <Field label="Auth Token" hint="Se guarda de forma segura">
-            <Input
-              value={profile?.twilioAuthToken ?? ''}
-              onChange={e => setProfile(p => ({ ...p, twilioAuthToken: e.target.value }))}
-              placeholder="••••••••••••••••••••••••••••••••"
-              type="password"
-            />
-          </Field>
-          <Field label="Número de WhatsApp" hint="Con código de país, ej: +59899123456">
-            <Input
-              value={profile?.twilioWaNumber ?? ''}
-              onChange={e => setProfile(p => ({ ...p, twilioWaNumber: e.target.value }))}
-              placeholder="+59899123456"
-            />
-          </Field>
-          <Field label="URL del webhook" hint="Pegá esto en Twilio → Sandbox Settings">
-            <div style={{
-              background: 'var(--surface3)', border: '1px solid var(--border)', borderRadius: 6,
-              padding: '8px 12px', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--muted)',
-              wordBreak: 'break-all', userSelect: 'all', cursor: 'copy',
-            }}
-              onClick={e => { navigator.clipboard.writeText(e.currentTarget.textContent ?? ''); toast.success('URL copiada') }}
-              title="Click para copiar"
-            >
-              {`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-inbound`}
+      {/* WhatsApp — selector de proveedor */}
+      <Section title="Conexión WhatsApp" subtitle="Elegí tu proveedor de WhatsApp Business">
+
+        {/* Toggle Twilio / Meta */}
+        <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
+          {[
+            { id: 'twilio', label: 'Twilio', desc: 'Sandbox y testing' },
+            { id: 'meta',   label: 'Meta WhatsApp Cloud API', desc: 'Producción — número propio' },
+          ].map(p => (
+            <div key={p.id} onClick={() => setProfile(pr => ({ ...pr, waProvider: p.id }))} style={{
+              flex: 1, padding: '10px 14px', borderRadius: 8, cursor: 'pointer',
+              background: profile?.waProvider === p.id ? 'var(--green-p)' : 'var(--surface2)',
+              border: `1px solid ${profile?.waProvider === p.id ? 'var(--green-l)' : 'var(--border)'}`,
+              transition: 'all .15s',
+            }}>
+              <div style={{ fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-ui)', color: profile?.waProvider === p.id ? 'var(--green-l)' : 'var(--white)' }}>{p.label}</div>
+              <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>{p.desc}</div>
             </div>
-          </Field>
+          ))}
         </div>
+
+        {/* Twilio */}
+        {profile?.waProvider !== 'meta' && (
+          <>
+            <div style={{ padding: '10px 14px', borderRadius: 8, background: 'var(--surface2)', border: '1px solid var(--border)', marginBottom: 16, fontSize: 11, color: 'var(--muted)', lineHeight: 1.6 }}>
+              Crear cuenta en <a href="https://twilio.com" target="_blank" rel="noreferrer">twilio.com</a> → Console → Account Info. El número debe tener WhatsApp habilitado.
+            </div>
+            <div className="config-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <Field label="Account SID" hint="Empieza con AC...">
+                <Input value={profile?.twilioAccountSid ?? ''} onChange={e => setProfile(p => ({ ...p, twilioAccountSid: e.target.value }))} placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" />
+              </Field>
+              <Field label="Auth Token" hint="Se guarda de forma segura">
+                <Input value={profile?.twilioAuthToken ?? ''} onChange={e => setProfile(p => ({ ...p, twilioAuthToken: e.target.value }))} placeholder="••••••••••••••••••••••••••••••••" type="password" />
+              </Field>
+              <Field label="Número de WhatsApp" hint="Con código de país, ej: +59899123456">
+                <Input value={profile?.twilioWaNumber ?? ''} onChange={e => setProfile(p => ({ ...p, twilioWaNumber: e.target.value }))} placeholder="+59899123456" />
+              </Field>
+              <Field label="URL del webhook" hint="Pegá esto en Twilio → Sandbox Settings">
+                <div style={{ background: 'var(--surface3)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 12px', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--muted)', wordBreak: 'break-all', cursor: 'copy' }}
+                  onClick={e => { navigator.clipboard.writeText(e.currentTarget.textContent ?? ''); toast.success('URL copiada') }}>
+                  {`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-inbound`}
+                </div>
+              </Field>
+            </div>
+          </>
+        )}
+
+        {/* Meta WhatsApp Cloud API */}
+        {profile?.waProvider === 'meta' && (
+          <>
+            <div style={{ padding: '12px 14px', borderRadius: 8, background: 'var(--surface2)', border: '1px solid var(--border)', marginBottom: 16, fontSize: 11, color: 'var(--muted)', lineHeight: 1.7 }}>
+              <strong style={{ color: 'var(--white)', display: 'block', marginBottom: 4 }}>Pasos para configurar Meta WhatsApp Cloud API:</strong>
+              1. Crear cuenta en <a href="https://developers.facebook.com" target="_blank" rel="noreferrer">developers.facebook.com</a> → Nueva App → WhatsApp{' '}
+              2. En WhatsApp → Configuración API: conseguís el <strong>Phone Number ID</strong> y el <strong>WABA ID</strong>{' '}
+              3. Generar un <strong>Token de acceso permanente</strong> desde el Business Manager{' '}
+              4. Configurar el webhook con la URL y el token de verificación que definís vos
+            </div>
+            <div className="config-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <Field label="Phone Number ID" hint="ID numérico del número en Meta">
+                <Input value={profile?.metaPhoneNumberId ?? ''} onChange={e => setProfile(p => ({ ...p, metaPhoneNumberId: e.target.value }))} placeholder="123456789012345" />
+              </Field>
+              <Field label="WABA ID" hint="WhatsApp Business Account ID">
+                <Input value={profile?.metaWabaId ?? ''} onChange={e => setProfile(p => ({ ...p, metaWabaId: e.target.value }))} placeholder="123456789012345" />
+              </Field>
+              <Field label="Access Token" hint="Token permanente del sistema">
+                <Input value={profile?.metaAccessToken ?? ''} onChange={e => setProfile(p => ({ ...p, metaAccessToken: e.target.value }))} placeholder="EAAxxxxxxxxxx..." type="password" />
+              </Field>
+              <Field label="Verify Token" hint="Lo elegís vos — lo usás al configurar el webhook en Meta">
+                <Input value={profile?.metaVerifyToken ?? ''} onChange={e => setProfile(p => ({ ...p, metaVerifyToken: e.target.value }))} placeholder="mi-token-secreto-123" />
+              </Field>
+              <Field label="URL del webhook" hint="Pegá esto en Meta → Configuración del webhook">
+                <div style={{ background: 'var(--surface3)', border: '1px solid var(--border)', borderRadius: 6, padding: '8px 12px', fontSize: 11, fontFamily: 'var(--font-mono)', color: 'var(--muted)', wordBreak: 'break-all', cursor: 'copy' }}
+                  onClick={e => { navigator.clipboard.writeText(e.currentTarget.textContent ?? ''); toast.success('URL copiada') }}>
+                  {`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-meta-inbound`}
+                </div>
+              </Field>
+            </div>
+          </>
+        )}
       </Section>
 
       {/* Métodos de pago */}
