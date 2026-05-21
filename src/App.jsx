@@ -14,6 +14,7 @@ import { Clientes }      from '@/pages/Clientes'
 import { AgenteIA }      from '@/pages/AgenteIA'
 import { Configuracion } from '@/pages/Configuracion'
 import { Login }         from '@/pages/Login'
+import { PaginaPago }    from '@/pages/PaginaPago'
 
 function Spinner() {
   return (
@@ -33,6 +34,9 @@ export default function App() {
   const { data: user } = useApi(api.getUser)
   const [facturaModal, setFacturaModal] = useState(false)
   const [facturaKey, setFacturaKey] = useState(0)
+
+  // Página de pago pública — no requiere login
+  if (window.location.pathname.startsWith('/pagar/')) return <PaginaPago />
 
   if (authLoading) return <Spinner />
   if (!session)    return <Login />

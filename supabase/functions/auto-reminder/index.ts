@@ -107,7 +107,9 @@ serve(async (req) => {
         if (!client?.phone) { stats.skipped++; continue }
 
         try {
-          const prompt = `Redactá un recordatorio de pago ${tone} para la factura ${inv.cfe_id} por $${Number(inv.amount).toLocaleString('es-UY')} UYU con vencimiento el ${inv.due}. Sé conciso (máximo 4 oraciones). No uses listas ni bullets. Firma como: ${firma}`
+          const APP_URL     = Deno.env.get('APP_URL') ?? 'https://cobraya-7354.vercel.app'
+          const paymentLink = `${APP_URL}/pagar/${inv.id}`
+          const prompt = `Redactá un recordatorio de pago ${tone} para la factura ${inv.cfe_id} por $${Number(inv.amount).toLocaleString('es-UY')} UYU con vencimiento el ${inv.due}. Incluí este link al final para que pueda ver los detalles y pagar: ${paymentLink} — Sé conciso (máximo 4 oraciones). No uses listas ni bullets. Firma como: ${firma}`
           const msg = await callClaude(
             `Sos el asistente de cobros de ${profile.company ?? 'la empresa'}. Respondé solo con el mensaje de WhatsApp, sin comillas ni comentarios.`,
             [{ role: 'user', content: prompt }],
@@ -209,7 +211,9 @@ serve(async (req) => {
             continue
           }
 
-          const prompt = `Redactá un seguimiento de cobro ${tone} para la factura vencida ${inv.cfe_id} por $${Number(inv.amount).toLocaleString('es-UY')} UYU (venció el ${inv.due}). Es el mensaje número ${agentMsgs.length + 1}. ${cfg.offer_payment_plan ? `Podés mencionar que hay posibilidad de plan de ${cfg.payment_plan_installments} cuotas.` : ''} Máximo 4 oraciones. Firma como: ${firma}`
+          const APP_URL_fu     = Deno.env.get('APP_URL') ?? 'https://cobraya-7354.vercel.app'
+          const paymentLinkFu = `${APP_URL_fu}/pagar/${inv.id}`
+          const prompt = `Redactá un seguimiento de cobro ${tone} para la factura vencida ${inv.cfe_id} por $${Number(inv.amount).toLocaleString('es-UY')} UYU (venció el ${inv.due}). Es el mensaje número ${agentMsgs.length + 1}. Incluí este link para que pueda pagar o subir comprobante: ${paymentLinkFu} — ${cfg.offer_payment_plan ? `Podés mencionar que hay posibilidad de plan de ${cfg.payment_plan_installments} cuotas.` : ''} Máximo 4 oraciones. Firma como: ${firma}`
 
           const msg = await callClaude(
             `Sos el asistente de cobros de ${profile.company ?? 'la empresa'}. Respondé solo con el mensaje de WhatsApp, sin comillas ni comentarios.`,

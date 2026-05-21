@@ -49,10 +49,14 @@ serve(async (req) => {
     const tone  = toneMap[agentCfg?.tone ?? 'profesional']
     const firma = profile?.signature || profile?.company || 'El equipo de cobros'
 
+    // ── Link de pago personalizado ───────────────────────────
+    const APP_URL    = Deno.env.get('APP_URL') ?? 'https://cobraya-7354.vercel.app'
+    const paymentLink = `${APP_URL}/pagar/${invoiceId}`
+
     // ── Prompt según tipo de acción ──────────────────────────
     const prompts: Record<string, string> = {
-      reminder: `Redactá un recordatorio de pago ${tone} para la factura ${invoice.cfe_id} por $${Number(invoice.amount).toLocaleString('es-UY')} UYU con vencimiento el ${invoice.due}. Sé conciso (máximo 4 oraciones). No uses listas ni bullets. Firma como: ${firma}`,
-      ai:       `Redactá un mensaje inicial para gestionar el cobro de la factura vencida ${invoice.cfe_id} por $${Number(invoice.amount).toLocaleString('es-UY')} UYU (venció el ${invoice.due}). Tono ${tone}. ${agentCfg?.offer_payment_plan ? `Mencioná que hay posibilidad de plan de ${agentCfg.payment_plan_installments} cuotas.` : ''} Máximo 4 oraciones. Firma como: ${firma}`,
+      reminder: `Redactá un recordatorio de pago ${tone} para la factura ${invoice.cfe_id} por $${Number(invoice.amount).toLocaleString('es-UY')} UYU con vencimiento el ${invoice.due}. Incluí este link al final para que pueda pagar o subir el comprobante: ${paymentLink} — Sé conciso (máximo 4 oraciones). No uses listas ni bullets. Firma como: ${firma}`,
+      ai:       `Redactá un mensaje inicial para gestionar el cobro de la factura vencida ${invoice.cfe_id} por $${Number(invoice.amount).toLocaleString('es-UY')} UYU (venció el ${invoice.due}). Incluí este link para que pueda ver los detalles y pagar: ${paymentLink} — Tono ${tone}. ${agentCfg?.offer_payment_plan ? `Mencioná que hay posibilidad de plan de ${agentCfg.payment_plan_installments} cuotas.` : ''} Máximo 4 oraciones. Firma como: ${firma}`,
     }
 
     const messageBody = await callClaude(
