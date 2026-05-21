@@ -25,7 +25,7 @@ export function Header({ user, onNuevaFactura }) {
       height: 'var(--header-h)', padding: '0 24px',
       display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       borderBottom: '1px solid var(--border)',
-      background: 'rgba(8,8,8,0.85)',
+      background: 'rgba(245,242,238,0.88)',
       backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)',
       position: 'sticky', top: 0, zIndex: 50, flexShrink: 0,
     }}>
@@ -44,8 +44,8 @@ export function Header({ user, onNuevaFactura }) {
         {/* AI pulse */}
         <div title="Agente IA activo" style={{
           width: 34, height: 34, borderRadius: 8, cursor: 'pointer',
-          background: aiPulse ? 'rgba(45,158,95,0.2)' : 'rgba(45,158,95,0.07)',
-          border: '1px solid rgba(45,158,95,0.3)',
+          background: aiPulse ? 'rgba(22,163,74,0.15)' : 'rgba(22,163,74,0.07)',
+          border: '1px solid rgba(22,163,74,0.25)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 14, transition: 'background .4s',
           animation: aiPulse ? 'glow .8s ease' : 'none',

@@ -8,9 +8,10 @@ export function Button({ children, variant = 'primary', size = 'md', onClick, di
   }
   const sizes = { sm: { padding: '5px 12px', fontSize: 11 }, md: { padding: '8px 16px', fontSize: 12 }, lg: { padding: '11px 22px', fontSize: 13 } }
   const variants = {
-    primary: { background: 'var(--green)', color: 'var(--white)' },
+    primary: { background: 'var(--green)', color: '#ffffff' },
+    outline: { background: 'transparent', color: 'var(--muted)', border: '1px solid var(--border2)' },
     ghost:   { background: 'transparent', color: 'var(--muted)', border: '1px solid var(--border2)' },
-    danger:  { background: 'rgba(224,96,96,.15)', color: 'var(--red)', border: '1px solid rgba(224,96,96,.3)' },
+    danger:  { background: 'rgba(220,38,38,.08)', color: 'var(--red)', border: '1px solid rgba(220,38,38,.2)' },
   }
   return (
     <button onClick={onClick} disabled={disabled} style={{ ...base, ...sizes[size], ...variants[variant], ...style }}>

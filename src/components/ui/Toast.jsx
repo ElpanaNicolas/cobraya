@@ -9,9 +9,9 @@ export const toast = {
 }
 
 const COLORS = {
-  success: { bg: 'rgba(45,158,95,0.15)',  border: 'rgba(45,158,95,0.35)',  icon: '✓', color: '#4caf7d' },
-  error:   { bg: 'rgba(224,96,96,0.15)',  border: 'rgba(224,96,96,0.35)',  icon: '✕', color: '#e06060' },
-  info:    { bg: 'rgba(91,196,232,0.12)', border: 'rgba(91,196,232,0.3)',  icon: 'ℹ', color: '#5bc4e8' },
+  success: { bg: '#f0fdf4', border: '#bbf7d0', icon: '✓', color: '#15803d' },
+  error:   { bg: '#fef2f2', border: '#fecaca', icon: '✕', color: '#dc2626' },
+  info:    { bg: '#eff6ff', border: '#bfdbfe', icon: 'ℹ', color: '#2563eb' },
 }
 
 function ToastItem({ toast: t, onRemove }) {

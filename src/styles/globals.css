@@ -1,27 +1,27 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
-  /* Colors */
-  --bg:        #080808;
-  --surface:   #111111;
-  --surface2:  #181818;
-  --surface3:  #1f1f1f;
-  --border:    rgba(255,255,255,0.07);
-  --border2:   rgba(255,255,255,0.13);
+  /* ── Paleta clara / warm minimalist ── */
+  --bg:        #f5f2ee;          /* crema cálido */
+  --surface:   #ffffff;          /* blanco para cards */
+  --surface2:  #efebe5;          /* inputs / fondo secundario */
+  --surface3:  #e8e3dc;          /* hover / terciario */
+  --border:    rgba(0,0,0,0.07);
+  --border2:   rgba(0,0,0,0.12);
 
-  --green:     #1a6b3c;
-  --green-l:   #2d9e5f;
-  --green-p:   rgba(26,107,60,0.15);
-  --green-glow:rgba(45,158,95,0.25);
+  --green:     #15803d;          /* verde oscuro para light bg */
+  --green-l:   #16a34a;
+  --green-p:   rgba(22,163,74,0.10);
+  --green-glow:rgba(22,163,74,0.18);
 
-  --white:     #f0ece4;
-  --muted:     rgba(240,236,228,0.42);
-  --muted2:    rgba(240,236,228,0.2);
+  --white:     #1c1917;          /* texto principal (near-black) */
+  --muted:     rgba(28,25,23,0.50);
+  --muted2:    rgba(28,25,23,0.28);
 
-  --amber:     #e8a020;
-  --red:       #e06060;
-  --purple:    #9b8cff;
-  --blue:      #5bc4e8;
+  --amber:     #b45309;
+  --red:       #dc2626;
+  --purple:    #7c3aed;
+  --blue:      #2563eb;
 
   /* Typography */
   --font-display: 'Fraunces', serif;
@@ -33,6 +33,10 @@
   --header-h:   60px;
   --radius:     10px;
   --radius-sm:  6px;
+
+  /* Sombras — reemplazan bordes duros en light mode */
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow:    0 4px 12px rgba(0,0,0,0.07), 0 1px 3px rgba(0,0,0,0.05);
 }
 
 html, body, #root {
@@ -42,6 +46,15 @@ html, body, #root {
   font-family: var(--font-mono);
   font-size: 13px;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Links */
+a { color: var(--green); }
+
+/* Inputs globales — heredan el tema claro */
+input, textarea, select {
+  color-scheme: light;
 }
 
 /* Scrollbar */
