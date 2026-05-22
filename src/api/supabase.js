@@ -44,7 +44,7 @@ export const api = {
       metaAccessToken:      data.meta_access_token     ?? '',
       metaWabaId:           data.meta_waba_id          ?? '',
       metaVerifyToken:      data.meta_verify_token     ?? '',
-      onboardingCompleted:  data.onboarding_completed  ?? false,
+      onboardingCompleted:  data.onboarding_completed  ?? true,  // true = ya configurado (default seguro pre-migración)
     }
   },
 

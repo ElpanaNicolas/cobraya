@@ -5,6 +5,8 @@ import { Button } from '@/components/ui/Button'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { InvoiceDetail } from './InvoiceDetail'
 import { ImportarFacturasModal } from './ImportarFacturasModal'
+import { api } from '@/api'
+import { toast } from '@/components/ui/Toast'
 
 const FILTERS = [
   { id: 'all',           label: 'Todas'        },
@@ -98,13 +100,13 @@ export function InvoiceTable({ data, loading, onAction, onDelete, onRefetch }) {
     if (!checked.size) return
     setBulkLoading(true)
     try {
-      const { sent, failed } = await import('@/api').then(m => m.api.bulkReminder([...checked]))
-      if (sent > 0) { const { toast } = await import('@/components/ui/Toast'); toast.success(`${sent} recordatorio${sent > 1 ? 's' : ''} enviado${sent > 1 ? 's' : ''}`) }
-      if (failed > 0) { const { toast } = await import('@/components/ui/Toast'); toast.error(`${failed} error${failed > 1 ? 'es' : ''}`) }
+      const { sent, failed } = await api.bulkReminder([...checked])
+      if (sent > 0)   toast.success(`${sent} recordatorio${sent > 1 ? 's' : ''} enviado${sent > 1 ? 's' : ''}`)
+      if (failed > 0) toast.error(`${failed} error${failed > 1 ? 'es' : ''}`)
       setChecked(new Set())
       onRefetch?.()
     } catch (e) {
-      const { toast } = await import('@/components/ui/Toast'); toast.error(e.message)
+      toast.error(e.message)
     } finally {
       setBulkLoading(false)
     }
