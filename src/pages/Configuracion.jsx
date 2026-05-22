@@ -180,7 +180,7 @@ export function Configuracion() {
     setSaving(true)
     try {
       await Promise.all([
-        api.saveAgentConfig({ ...form, signature: `${profile?.company ?? ''} | ${form.whatsappNumber}` }),
+        api.saveAgentConfig(form),
         api.saveProfile(profile),
       ])
       setSaved(true)
@@ -428,8 +428,11 @@ export function Configuracion() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: profile?.mpAccessToken ? 14 : 0 }}>
             <div style={{ width: 32, height: 32, borderRadius: 8, background: '#009ee3', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>💳</div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 12, fontFamily: 'var(--font-ui)', fontWeight: 700 }}>MercadoPago</div>
-              <div style={{ fontSize: 10, color: 'var(--muted)' }}>Tarjeta, saldo MP, cuotas</div>
+              <div style={{ fontSize: 12, fontFamily: 'var(--font-ui)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                MercadoPago
+                <span style={{ fontSize: 9, fontWeight: 700, background: 'rgba(0,158,227,0.15)', color: '#009ee3', border: '1px solid rgba(0,158,227,0.3)', borderRadius: 4, padding: '1px 6px', letterSpacing: '0.02em' }}>RECOMENDADO 🇺🇾</span>
+              </div>
+              <div style={{ fontSize: 10, color: 'var(--muted)' }}>Tarjeta, saldo MP, cuotas — funciona en Uruguay</div>
             </div>
             <Toggle
               value={!!profile?.mpAccessToken}
@@ -498,8 +501,11 @@ export function Configuracion() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: profile?.stripePk ? 14 : 0 }}>
             <div style={{ width: 32, height: 32, borderRadius: 8, background: '#635bff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0 }}>  </div>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 12, fontFamily: 'var(--font-ui)', fontWeight: 700 }}>Apple Pay · Google Pay · Tarjeta</div>
-              <div style={{ fontSize: 10, color: 'var(--muted)' }}>Vía Stripe — detecta el método según el dispositivo del cliente</div>
+              <div style={{ fontSize: 12, fontFamily: 'var(--font-ui)', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6 }}>
+                Apple Pay · Google Pay · Tarjeta
+                <span style={{ fontSize: 9, fontWeight: 700, background: 'rgba(99,91,255,0.12)', color: '#a5b4fc', border: '1px solid rgba(99,91,255,0.25)', borderRadius: 4, padding: '1px 6px', letterSpacing: '0.02em' }}>INTERNACIONAL 🌎</span>
+              </div>
+              <div style={{ fontSize: 10, color: 'var(--muted)' }}>Vía Stripe — solo para empresas registradas fuera de Uruguay</div>
             </div>
             <Toggle
               value={!!profile?.stripePk}
@@ -509,10 +515,10 @@ export function Configuracion() {
           </div>
           {(!!profile?.stripePk || profile?.stripePk === '') && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-              <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(99,91,255,0.07)', border: '1px solid rgba(99,91,255,0.2)', marginBottom: 14, fontSize: 11, color: 'var(--muted)', lineHeight: 1.6 }}>
-                <span style={{ color: '#a5b4fc', fontWeight: 700 }}>¿Cómo configurarlo?</span>
-                {' '}Crear cuenta en <a href="https://stripe.com" target="_blank" rel="noreferrer" style={{ color: '#a5b4fc' }}>stripe.com</a> → Developers → API Keys.
-                Apple Pay y Google Pay se activan automáticamente según el dispositivo del cliente.
+              <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.2)', marginBottom: 14, fontSize: 11, color: 'var(--muted)', lineHeight: 1.6 }}>
+                <span style={{ color: '#fbbf24', fontWeight: 700 }}>⚠️ Stripe no soporta Uruguay como país de cobro.</span>
+                {' '}Solo podés usarlo si tu empresa está registrada en USA, Europa u otro país compatible. Para cobros en Uruguay usá <strong style={{ color: 'var(--white)' }}>MercadoPago</strong>.
+                {' '}Más info en <a href="https://stripe.com/global" target="_blank" rel="noreferrer" style={{ color: '#a5b4fc' }}>stripe.com/global</a>.
               </div>
               <div className="config-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                 <Field label="Publishable Key" hint="Empieza con pk_live_ o pk_test_">
