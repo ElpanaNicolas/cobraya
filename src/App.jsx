@@ -9,6 +9,7 @@ import { MobileNav } from '@/components/layout/MobileNav'
 import { NuevaFacturaModal } from '@/components/invoices/NuevaFacturaModal'
 import { Toaster } from '@/components/ui/Toast'
 import { Login }   from '@/pages/Login'
+import { Landing }  from '@/pages/Landing'
 
 // Lazy-load pages — each gets its own chunk, slashing initial bundle size
 const Dashboard       = lazy(() => import('@/pages/Dashboard').then(m => ({ default: m.Dashboard })))
@@ -44,7 +45,12 @@ export default function App() {
   )
 
   if (authLoading) return <Spinner />
-  if (!session)    return <Login />
+  if (!session) {
+    const path = window.location.pathname
+    // Landing en raíz; Login en /entrar o cualquier otra ruta protegida
+    if (path === '/') return <Landing />
+    return <Login />
+  }
 
   // Onboarding — muestra el wizard hasta que se complete
   if (user && user.onboardingCompleted === false) {
