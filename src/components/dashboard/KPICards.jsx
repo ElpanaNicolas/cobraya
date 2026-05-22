@@ -4,7 +4,7 @@ import { Skeleton } from '@/components/ui/Skeleton'
 export function KPICards({ data, loading }) {
   if (loading) {
     return (
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
+      <div className="kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
         {[0,1,2,3].map(i => (
           <div key={i} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', padding: '16px 18px' }}>
             <Skeleton w="55%" h={10} />
@@ -19,7 +19,7 @@ export function KPICards({ data, loading }) {
   if (!data?.length) return null
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
+    <div className="kpi-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12 }}>
       {data.map((kpi, i) => {
         const isCobrado = kpi.id === 'cobrado'
         const isVencido = kpi.id === 'vencido'

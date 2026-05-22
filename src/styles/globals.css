@@ -130,8 +130,9 @@ scrollbar-color: var(--border2) transparent;
   /* Padding de páginas: 24→16px */
   .page-pad { padding: 16px !important; gap: 12px !important; }
 
-  /* Dashboard: 2 cols → 1 col */
+  /* Dashboard: layout 1 col, KPIs 2×2 */
   .dashboard-grid { grid-template-columns: 1fr !important; }
+  .kpi-grid { grid-template-columns: 1fr 1fr !important; gap: 10px !important; }
 
   /* StatBar: 5 cards → scroll horizontal */
   .stat-bar {
