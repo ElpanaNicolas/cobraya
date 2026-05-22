@@ -31,14 +31,14 @@ function StripeForm({ onSuccess, onError }) {
     e.preventDefault()
     if (!stripe || !elements) return
     setPaying(true)
-    const { error } = await stripe.confirmPayment({
+    const { error, paymentIntent } = await stripe.confirmPayment({
       elements,
       redirect: 'if_required',
     })
     if (error) {
       onError(error.message)
     } else {
-      onSuccess()
+      onSuccess(paymentIntent?.id ?? null)
     }
     setPaying(false)
   }
@@ -103,12 +103,31 @@ export function PaginaPago() {
   }, [invoiceId, isDemo])
 
   // Redirigido de vuelta desde MercadoPago
+  // MP agrega: ?collection_status=approved&payment_id=xxx&status=approved
   useEffect(() => {
-    const status = params.get('status')
-    if (status === 'success') { setScreen('success'); setMsg('¡Pago confirmado! Tu pago fue procesado correctamente.') }
-    else if (status === 'failure') { setScreen('error'); setMsg('El pago no se procesó. Podés intentarlo de nuevo o usar otro método.') }
-    else if (status === 'pending') { setScreen('success'); setMsg('Pago en proceso. Te avisaremos cuando se confirme.') }
-  }, [params])
+    const collectionStatus = params.get('collection_status') || params.get('status')
+    const mpPaymentId      = params.get('payment_id') || params.get('collection_id')
+    if (!collectionStatus) return
+
+    if (collectionStatus === 'approved') {
+      setScreen('success')
+      setMsg('¡Pago aprobado! Tu pago fue procesado correctamente.')
+      setInfo(prev => prev ? { ...prev, status: 'paid' } : prev)
+      // Confirmar en servidor (en caso de que el webhook automático no haya llegado aún)
+      if (mpPaymentId && invoiceId && !isDemo) {
+        callFn('payment-webhook', {
+          method: 'POST',
+          body: JSON.stringify({ source: 'mp', invoiceId, paymentId: mpPaymentId }),
+        }).catch(() => {})
+      }
+    } else if (collectionStatus === 'rejected' || collectionStatus === 'failure') {
+      setScreen('error')
+      setMsg('El pago no se procesó. Podés intentarlo de nuevo o usar otro método.')
+    } else if (collectionStatus === 'pending' || collectionStatus === 'in_process') {
+      setScreen('success')
+      setMsg('Pago en proceso. Te avisaremos cuando se confirme.')
+    }
+  }, [params, invoiceId, isDemo])
 
   // ── Iniciar MercadoPago ──────────────────────────────────────
   async function handleMercadoPago() {
@@ -217,7 +236,18 @@ export function PaginaPago() {
       {clientSecret && stripePromise ? (
         <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: 'night' } }}>
           <StripeForm
-            onSuccess={() => { setScreen('success'); setMsg('¡Pago con tarjeta confirmado!'); setInfo(i => ({ ...i, status: 'paid' })) }}
+            onSuccess={async (paymentIntentId) => {
+              setScreen('success')
+              setMsg('¡Pago con tarjeta confirmado!')
+              setInfo(i => ({ ...i, status: 'paid' }))
+              // Confirmar en servidor (marca la factura como pagada en la DB)
+              if (paymentIntentId && !isDemo) {
+                callFn('payment-webhook', {
+                  method: 'POST',
+                  body: JSON.stringify({ source: 'stripe', invoiceId, paymentIntentId }),
+                }).catch(() => {})
+              }
+            }}
             onError={err => { setScreen('error'); setMsg(err) }}
           />
         </Elements>
