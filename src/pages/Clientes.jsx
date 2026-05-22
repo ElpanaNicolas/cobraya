@@ -71,18 +71,18 @@ function ClientRow({ client, expanded, onToggle, onDelete, onEdit }) {
             : <span style={{ fontSize: 11, color: '#4caf7d' }}>✓ Al día</span>
           }
         </td>
-        <td style={{ padding: '13px 16px' }}>
+        <td className="col-hide-mobile" style={{ padding: '13px 16px' }}>
           <div style={{ minWidth: 120 }}><ScoreBar score={client.riskScore} /></div>
           <div style={{ marginTop: 4 }}><RiskBadge score={client.riskScore} /></div>
         </td>
-        <td style={{ padding: '13px 16px', fontSize: 11, color: 'var(--muted)' }}>
+        <td className="col-hide-mobile" style={{ padding: '13px 16px', fontSize: 11, color: 'var(--muted)' }}>
           {client.avgDaysToPay === 0 ? <span style={{ color: 'var(--muted2)' }}>—</span> : `${client.avgDaysToPay}d`}
         </td>
-        <td style={{ padding: '13px 16px', fontSize: 11, color: 'var(--muted)' }}>
+        <td className="col-hide-mobile" style={{ padding: '13px 16px', fontSize: 11, color: 'var(--muted)' }}>
           {client.invoiceCount}
         </td>
         <td style={{ padding: '13px 16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div className="table-actions" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontSize: 10, fontFamily: 'var(--font-ui)', fontWeight: 700, color: expanded ? 'var(--green-l)' : 'var(--muted)' }}>
               {expanded ? 'Cerrar ↑' : 'Ver →'}
             </span>
@@ -131,7 +131,7 @@ function ClientRow({ client, expanded, onToggle, onDelete, onEdit }) {
                 ))}
               </div>
               {!chatTab && (
-                <div style={{ padding: '16px 20px', display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 20 }}>
+                <div className="client-detail-grid" style={{ padding: '16px 20px', display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 20 }}>
                   <div>
                     <div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--muted)', marginBottom: 6 }}>Contacto</div>
                     <div style={{ fontSize: 12 }}>{client.phone || '—'}</div>
@@ -243,7 +243,9 @@ export function Clientes() {
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)' }}>
                 {COLS.map(h => (
-                  <th key={h} style={{ padding: '9px 16px', textAlign: 'left', fontSize: 9, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)', fontWeight: 700, fontFamily: 'var(--font-ui)', whiteSpace: 'nowrap' }}>{h}</th>
+                  <th key={h}
+                    className={['Score de riesgo', 'Días prom.', 'Facturas'].includes(h) ? 'col-hide-mobile' : ''}
+                    style={{ padding: '9px 16px', textAlign: 'left', fontSize: 9, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)', fontWeight: 700, fontFamily: 'var(--font-ui)', whiteSpace: 'nowrap' }}>{h}</th>
                 ))}
               </tr>
             </thead>

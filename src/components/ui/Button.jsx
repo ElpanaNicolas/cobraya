@@ -1,4 +1,4 @@
-export function Button({ children, variant = 'primary', size = 'md', onClick, disabled, style = {} }) {
+export function Button({ children, variant = 'primary', size = 'md', onClick, disabled, style = {}, className = '' }) {
   const base = {
     display: 'inline-flex', alignItems: 'center', gap: 6,
     border: 'none', borderRadius: 'var(--radius-sm)',
@@ -14,7 +14,7 @@ export function Button({ children, variant = 'primary', size = 'md', onClick, di
     danger:  { background: 'rgba(220,38,38,.08)', color: 'var(--red)', border: '1px solid rgba(220,38,38,.2)' },
   }
   return (
-    <button onClick={onClick} disabled={disabled} style={{ ...base, ...sizes[size], ...variants[variant], ...style }}>
+    <button onClick={onClick} disabled={disabled} className={className} style={{ ...base, ...sizes[size], ...variants[variant], ...style }}>
       {children}
     </button>
   )

@@ -224,7 +224,9 @@ export function InvoiceTable({ data, loading, onAction, onDelete, onRefetch }) {
                   style={{ cursor: 'pointer', accentColor: 'var(--green)' }} />
               </th>
               {COLS.slice(1).map(h => (
-                <th key={h} style={{ padding: '9px 16px', textAlign: 'left', fontSize: 9, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)', fontWeight: 700, fontFamily: 'var(--font-ui)', whiteSpace: 'nowrap' }}>{h}</th>
+                <th key={h}
+                  className={h === 'CFE / ID' || h === 'Canal' ? 'col-hide-mobile' : ''}
+                  style={{ padding: '9px 16px', textAlign: 'left', fontSize: 9, letterSpacing: '.1em', textTransform: 'uppercase', color: 'var(--muted)', fontWeight: 700, fontFamily: 'var(--font-ui)', whiteSpace: 'nowrap' }}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -281,7 +283,7 @@ export function InvoiceTable({ data, loading, onAction, onDelete, onRefetch }) {
                           style={{ cursor: 'pointer', accentColor: 'var(--green)' }} />
                       )}
                     </td>
-                    <td style={{ padding: '12px 16px', color: 'var(--muted)', fontStyle: 'italic', fontSize: 10 }}>{inv.cfeId ?? inv.id}</td>
+                    <td className="col-hide-mobile" style={{ padding: '12px 16px', color: 'var(--muted)', fontStyle: 'italic', fontSize: 10 }}>{inv.cfeId ?? inv.id}</td>
                     <td style={{ padding: '12px 16px', fontFamily: 'var(--font-ui)', fontWeight: 600, fontSize: 12 }}>{inv.client}</td>
                     <td style={{ padding: '12px 16px', fontFamily: 'var(--font-display)', fontWeight: 700, fontSize: 14, letterSpacing: '-0.01em' }}>{fmt(inv.amount)}</td>
                     <td style={{ padding: '12px 16px', fontSize: 11 }}>
@@ -294,11 +296,11 @@ export function InvoiceTable({ data, loading, onAction, onDelete, onRefetch }) {
                         )}
                       </span>
                     </td>
-                    <td style={{ padding: '12px 16px', fontSize: 14 }}>
+                    <td className="col-hide-mobile" style={{ padding: '12px 16px', fontSize: 14 }}>
                       {inv.channel === 'whatsapp' ? '📲' : inv.channel === 'email' ? '📧' : <span style={{ color: 'var(--muted2)', fontSize: 10 }}>—</span>}
                     </td>
                     <td style={{ padding: '12px 16px' }}><Badge status={inv.status} /></td>
-                    <td style={{ padding: '12px 16px' }}>
+                    <td className="invoice-row-actions" style={{ padding: '12px 16px' }}>
                       <Button variant="ghost" size="sm" onClick={e => { e.stopPropagation(); setSelected(isSel ? null : inv) }}>
                         {isSel ? 'Cerrar' : 'Ver →'}
                       </Button>

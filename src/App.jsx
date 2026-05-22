@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, lazy, Suspense } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import { useAuth } from '@/context/AuthContext'
 import { useApi } from '@/hooks/useApi'
@@ -8,14 +8,16 @@ import { Header }  from '@/components/layout/Header'
 import { MobileNav } from '@/components/layout/MobileNav'
 import { NuevaFacturaModal } from '@/components/invoices/NuevaFacturaModal'
 import { Toaster } from '@/components/ui/Toast'
-import { Dashboard }     from '@/pages/Dashboard'
-import { Facturas }      from '@/pages/Facturas'
-import { Clientes }      from '@/pages/Clientes'
-import { AgenteIA }      from '@/pages/AgenteIA'
-import { Configuracion } from '@/pages/Configuracion'
-import { Login }         from '@/pages/Login'
-import { PaginaPago }    from '@/pages/PaginaPago'
-import { OnboardingWizard } from '@/components/onboarding/OnboardingWizard'
+import { Login }   from '@/pages/Login'
+
+// Lazy-load pages — each gets its own chunk, slashing initial bundle size
+const Dashboard       = lazy(() => import('@/pages/Dashboard').then(m => ({ default: m.Dashboard })))
+const Facturas        = lazy(() => import('@/pages/Facturas').then(m => ({ default: m.Facturas })))
+const Clientes        = lazy(() => import('@/pages/Clientes').then(m => ({ default: m.Clientes })))
+const AgenteIA        = lazy(() => import('@/pages/AgenteIA').then(m => ({ default: m.AgenteIA })))
+const Configuracion   = lazy(() => import('@/pages/Configuracion').then(m => ({ default: m.Configuracion })))
+const PaginaPago      = lazy(() => import('@/pages/PaginaPago').then(m => ({ default: m.PaginaPago })))
+const OnboardingWizard = lazy(() => import('@/components/onboarding/OnboardingWizard').then(m => ({ default: m.OnboardingWizard })))
 
 function Spinner() {
   return (
@@ -37,7 +39,9 @@ export default function App() {
   const [facturaKey, setFacturaKey] = useState(0)
 
   // Página de pago pública — no requiere login
-  if (window.location.pathname.startsWith('/pagar/')) return <PaginaPago />
+  if (window.location.pathname.startsWith('/pagar/')) return (
+    <Suspense fallback={<Spinner />}><PaginaPago /></Suspense>
+  )
 
   if (authLoading) return <Spinner />
   if (!session)    return <Login />
@@ -46,10 +50,12 @@ export default function App() {
   if (user && user.onboardingCompleted === false) {
     return (
       <>
-        <OnboardingWizard onComplete={async (dest) => {
-          await refreshUser()
-          if (dest === 'config') window.location.href = '/config'
-        }} />
+        <Suspense fallback={<Spinner />}>
+          <OnboardingWizard onComplete={async (dest) => {
+            await refreshUser()
+            if (dest === 'config') window.location.href = '/config'
+          }} />
+        </Suspense>
         <Toaster />
       </>
     )
@@ -61,13 +67,15 @@ export default function App() {
       <div className="app-main" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         <Header user={user} onNuevaFactura={() => setFacturaModal(true)} />
         <main style={{ flex: 1, overflowY: 'auto' }}>
-          <Routes>
-            <Route path="/"          element={<Dashboard key={facturaKey} />} />
-            <Route path="/facturas"  element={<Facturas  key={facturaKey} />} />
-            <Route path="/clientes"  element={<Clientes />} />
-            <Route path="/agente-ia" element={<AgenteIA />} />
-            <Route path="/config"    element={<Configuracion />} />
-          </Routes>
+          <Suspense fallback={<Spinner />}>
+            <Routes>
+              <Route path="/"          element={<Dashboard key={facturaKey} />} />
+              <Route path="/facturas"  element={<Facturas  key={facturaKey} />} />
+              <Route path="/clientes"  element={<Clientes />} />
+              <Route path="/agente-ia" element={<AgenteIA />} />
+              <Route path="/config"    element={<Configuracion />} />
+            </Routes>
+          </Suspense>
         </main>
       </div>
 

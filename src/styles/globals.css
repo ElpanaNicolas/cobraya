@@ -174,4 +174,24 @@ scrollbar-color: var(--border2) transparent;
   .agente-sidebar { width: 100% !important; border-right: none !important; }
   .agente-sidebar--hidden { display: none !important; }
   .agente-back-btn { display: flex !important; }
+
+  /* iOS Safari: font < 16px dispara zoom automático al enfocar inputs → fijar a 16px */
+  input, textarea, select { font-size: 16px !important; }
+
+  /* Ocultar columnas de tabla no esenciales en pantallas pequeñas */
+  .col-hide-mobile { display: none !important; }
+
+  /* Client info grid: 3 cols → 1 col */
+  .client-detail-grid { grid-template-columns: 1fr !important; gap: 12px !important; }
+
+  /* Header: ocultar ícono AI (decorativo), compactar botón Nueva Factura */
+  .ai-pulse-icon { display: none !important; }
+  .nueva-factura { font-size: 10px !important; padding: 5px 10px !important; }
+
+  /* Tabla acciones: mínimo touch target de 44px (Apple HIG) */
+  .table-actions { gap: 14px !important; }
+  .table-actions > span { padding: 10px 2px !important; min-height: 44px; display: flex; align-items: center; }
+
+  /* Facturas — ocultar acciones secundarias en tabla, solo mostrar estado */
+  .invoice-row-actions { display: none !important; }
 }

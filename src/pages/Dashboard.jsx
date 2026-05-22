@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { api } from '@/api'
 import { useApi } from '@/hooks/useApi'
 import { KPICards }     from '@/components/dashboard/KPICards'
@@ -5,7 +6,11 @@ import { TrendChart }   from '@/components/dashboard/TrendChart'
 import { ActivityFeed } from '@/components/dashboard/ActivityFeed'
 import { InvoiceTable } from '@/components/invoices/InvoiceTable'
 import { toast } from '@/components/ui/Toast'
-import { MonthlyReportButton } from '@/components/reports/MonthlyReport'
+
+// @react-pdf/renderer es ~1.4 MB — cargarlo sólo cuando el usuario lo pide
+const MonthlyReportButton = lazy(() =>
+  import('@/components/reports/MonthlyReport').then(m => ({ default: m.MonthlyReportButton }))
+)
 
 export function Dashboard() {
   const kpis      = useApi(api.getKPIs)
@@ -44,7 +49,9 @@ export function Dashboard() {
 
       {/* Header row */}
       <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-        <MonthlyReportButton />
+        <Suspense fallback={null}>
+          <MonthlyReportButton />
+        </Suspense>
       </div>
 
       {/* KPIs */}

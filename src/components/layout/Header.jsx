@@ -59,10 +59,10 @@ export function Header({ user, onNuevaFactura }) {
       </div>
 
       <div className="header-actions" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-        <Button size="sm" onClick={onNuevaFactura}>+ Nueva factura</Button>
+        <Button size="sm" className="nueva-factura" onClick={onNuevaFactura}>+ Nueva factura</Button>
 
         {/* AI pulse */}
-        <div title="Agente IA activo" style={{
+        <div className="ai-pulse-icon" title="Agente IA activo" style={{
           width: 34, height: 34, borderRadius: 8, cursor: 'pointer',
           background: aiPulse ? 'rgba(22,163,74,0.15)' : 'rgba(22,163,74,0.07)',
           border: '1px solid rgba(22,163,74,0.25)',
