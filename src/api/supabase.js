@@ -250,46 +250,63 @@ export const api = {
 
   async getAgentConfig() {
     const { data: { user } } = await supabase.auth.getUser()
-    const { data, error } = await supabase
+
+    // maybeSingle para no lanzar error si el usuario aún no tiene fila
+    let { data } = await supabase
       .from('agent_config')
       .select('*')
       .eq('profile_id', user.id)
-      .single()
-    check(error)
-    const { data: profile } = await supabase.from('profiles').select('whatsapp').eq('id', user.id).single()
+      .maybeSingle()
+
+    // Si no existe la fila, crear una con valores por defecto
+    if (!data) {
+      const { data: created } = await supabase
+        .from('agent_config')
+        .insert({ profile_id: user.id })
+        .select('*')
+        .single()
+      data = created
+    }
+
+    const { data: profile } = await supabase.from('profiles').select('whatsapp, signature').eq('id', user.id).single()
 
     return {
-      enabled:                  data.enabled,
-      whatsappNumber:           profile?.whatsapp ?? '',
-      tone:                     data.tone,
-      firstReminderDays:        data.first_reminder_days,
-      followUpDays:             data.follow_up_days,
-      maxFollowUps:             data.max_follow_ups,
-      offerPaymentPlan:         data.offer_payment_plan,
-      paymentPlanInstallments:  data.payment_plan_installments,
-      escalateAfterDays:        data.escalate_after_days,
+      enabled:                 data?.enabled                  ?? true,
+      whatsappNumber:          profile?.whatsapp              ?? '',
+      tone:                    data?.tone                     ?? 'profesional',
+      firstReminderDays:       data?.first_reminder_days      ?? 1,
+      followUpDays:            data?.follow_up_days           ?? 5,
+      maxFollowUps:            data?.max_follow_ups           ?? 3,
+      preDueReminderDays:      data?.pre_due_reminder_days    ?? 3,
+      offerPaymentPlan:        data?.offer_payment_plan       ?? true,
+      paymentPlanInstallments: data?.payment_plan_installments ?? 3,
+      escalateAfterDays:       data?.escalate_after_days      ?? 15,
       channels: {
-        whatsapp: data.channel_whatsapp,
-        email:    data.channel_email,
+        whatsapp: data?.channel_whatsapp ?? true,
+        email:    data?.channel_email    ?? false,
       },
       workingHours: {
-        from: data.working_hours_from,
-        to:   data.working_hours_to,
+        from: data?.working_hours_from ?? '09:00',
+        to:   data?.working_hours_to   ?? '18:00',
       },
-      signature: profile?.whatsapp ?? '',
+      signature: profile?.signature ?? '',
     }
   },
 
   async saveAgentConfig(config) {
     const { data: { user } } = await supabase.auth.getUser()
+
+    // upsert en lugar de update para soportar usuarios sin fila previa
     const { error } = await supabase
       .from('agent_config')
-      .update({
+      .upsert({
+        profile_id:               user.id,
         enabled:                  config.enabled,
         tone:                     config.tone,
         first_reminder_days:      config.firstReminderDays,
         follow_up_days:           config.followUpDays,
         max_follow_ups:           config.maxFollowUps,
+        pre_due_reminder_days:    config.preDueReminderDays,
         offer_payment_plan:       config.offerPaymentPlan,
         payment_plan_installments: config.paymentPlanInstallments,
         escalate_after_days:      config.escalateAfterDays,
@@ -297,8 +314,7 @@ export const api = {
         channel_email:            config.channels.email,
         working_hours_from:       config.workingHours.from,
         working_hours_to:         config.workingHours.to,
-      })
-      .eq('profile_id', user.id)
+      }, { onConflict: 'profile_id' })
 
     await supabase.from('profiles').update({
       whatsapp:  config.whatsappNumber,
@@ -307,6 +323,14 @@ export const api = {
 
     check(error)
     return { ok: true }
+  },
+
+  async testAutoReminder() {
+    const { data, error } = await supabase.functions.invoke('auto-reminder', {
+      body: {},
+    })
+    if (error) throw new Error(error.message)
+    return data // { sent, skipped, errors }
   },
 
   async markPaid(invoiceId) {

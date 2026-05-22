@@ -85,6 +85,63 @@ const TONE_OPTIONS = [
   { id: 'firme',       label: 'Firme',       desc: 'Claro y sin rodeos. Para cuentas vencidas.' },
 ]
 
+function TestReminderButton() {
+  const [loading, setLoading] = useState(false)
+  const [result,  setResult]  = useState(null)
+
+  const run = async () => {
+    setLoading(true)
+    setResult(null)
+    try {
+      const r = await api.testAutoReminder()
+      setResult(r)
+      if ((r?.sent ?? 0) > 0) {
+        toast.success(`${r.sent} recordatorio${r.sent > 1 ? 's' : ''} enviado${r.sent > 1 ? 's' : ''}`)
+      } else {
+        toast.success('Agente ejecutado — no había facturas elegibles en este momento')
+      }
+    } catch (e) {
+      toast.error(e.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div style={{ marginTop: 4, padding: '14px 16px', background: 'rgba(22,163,74,0.04)', border: '1px solid rgba(22,163,74,0.15)', borderRadius: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ fontSize: 11, fontFamily: 'var(--font-ui)', fontWeight: 700, color: 'var(--green-l)', marginBottom: 3 }}>
+            📅 Ejecución automática diaria
+          </div>
+          <div style={{ fontSize: 10, color: 'var(--muted)', lineHeight: 1.5 }}>
+            El agente corre todos los días a las 09:00 (Uruguay). Guardá los cambios antes de probar.
+          </div>
+          {result && (
+            <div style={{ marginTop: 6, fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--font-mono)' }}>
+              Última ejecución → ✉ {result.sent ?? 0} enviados · ⏭ {result.skipped ?? 0} omitidos · ✗ {result.errors ?? 0} errores
+            </div>
+          )}
+        </div>
+        <button
+          onClick={run}
+          disabled={loading}
+          style={{
+            padding: '7px 16px', borderRadius: 6, cursor: loading ? 'not-allowed' : 'pointer',
+            background: loading ? 'transparent' : 'rgba(22,163,74,0.1)',
+            border: '1px solid rgba(22,163,74,0.3)',
+            color: 'var(--green-l)', fontSize: 11,
+            fontFamily: 'var(--font-ui)', fontWeight: 700,
+            opacity: loading ? 0.6 : 1, transition: 'all .15s', whiteSpace: 'nowrap',
+          }}
+        >
+          {loading ? '⏳ Ejecutando…' : '▶ Ejecutar ahora'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export function Configuracion() {
   const { data: cfg, loading } = useApi(useCallback(() => api.getAgentConfig(), []))
   const { data: user }         = useApi(useCallback(() => api.getUser(), []))
@@ -197,24 +254,53 @@ export function Configuracion() {
           </div>
         </Field>
 
+        {/* Timeline visual */}
+        <div style={{ margin: '4px 0 20px', padding: '14px 16px', background: 'var(--surface2)', borderRadius: 8, border: '1px solid var(--border)' }}>
+          <div style={{ fontSize: 9, textTransform: 'uppercase', letterSpacing: '.1em', color: 'var(--muted)', marginBottom: 10 }}>Línea de tiempo de recordatorios</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 0, fontSize: 10, overflowX: 'auto' }}>
+            {[
+              { label: `−${form.preDueReminderDays ?? 3}d`, desc: 'Aviso previo', color: 'var(--blue)', active: (form.preDueReminderDays ?? 3) > 0 },
+              { label: 'Vencimiento', desc: '📅', color: 'var(--muted)', active: true },
+              { label: `+${form.firstReminderDays ?? 1}d`, desc: '1° recordatorio', color: 'var(--amber)', active: true },
+              { label: `+${(form.firstReminderDays ?? 1) + (form.followUpDays ?? 5)}d`, desc: '2° follow-up', color: 'var(--red)', active: true },
+            ].map((step, i, arr) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', flex: i < arr.length - 1 ? 1 : 'none', minWidth: 0 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, opacity: step.active ? 1 : 0.35 }}>
+                  <div style={{ width: 8, height: 8, borderRadius: '50%', background: step.color, flexShrink: 0 }} />
+                  <div style={{ fontSize: 9, fontFamily: 'var(--font-ui)', fontWeight: 700, color: step.color, whiteSpace: 'nowrap' }}>{step.label}</div>
+                  <div style={{ fontSize: 9, color: 'var(--muted)', whiteSpace: 'nowrap' }}>{step.desc}</div>
+                </div>
+                {i < arr.length - 1 && (
+                  <div style={{ flex: 1, height: 1, background: 'var(--border2)', margin: '0 6px', marginBottom: 18 }} />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
         <div className="config-grid-3" style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
-          <Field label="Primer recordatorio" hint="Días antes del vencimiento">
-            <NumberInput value={form.firstReminderDays} onChange={e => set('firstReminderDays', +e.target.value)} min={1} max={30} />
+          <Field label="Aviso previo" hint="Días ANTES del vencimiento (0 = desactivado)">
+            <NumberInput value={form.preDueReminderDays ?? 3} onChange={e => set('preDueReminderDays', +e.target.value)} min={0} max={30} />
           </Field>
-          <Field label="Seguimiento" hint="Días entre recordatorios">
+          <Field label="Días de gracia" hint="Días DESPUÉS del vencimiento para el 1° recordatorio">
+            <NumberInput value={form.firstReminderDays} onChange={e => set('firstReminderDays', +e.target.value)} min={0} max={30} />
+          </Field>
+          <Field label="Seguimiento" hint="Días entre recordatorios sucesivos">
             <NumberInput value={form.followUpDays} onChange={e => set('followUpDays', +e.target.value)} min={1} max={30} />
-          </Field>
-          <Field label="Máx. recordatorios" hint="Antes de escalar a vos">
-            <NumberInput value={form.maxFollowUps} onChange={e => set('maxFollowUps', +e.target.value)} min={1} max={10} />
           </Field>
         </div>
 
-        <Field label="Escalar a propietario" hint="Si no hay respuesta luego de este plazo (días), te notificamos">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <NumberInput value={form.escalateAfterDays} onChange={e => set('escalateAfterDays', +e.target.value)} min={1} max={60} />
-            <span style={{ fontSize: 11, color: 'var(--muted)' }}>días sin respuesta</span>
-          </div>
-        </Field>
+        <div className="config-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          <Field label="Máx. recordatorios" hint="Luego de este límite el agente te escala a vos">
+            <NumberInput value={form.maxFollowUps} onChange={e => set('maxFollowUps', +e.target.value)} min={1} max={10} />
+          </Field>
+          <Field label="Escalar tras" hint="Días sin respuesta antes de notificarte">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <NumberInput value={form.escalateAfterDays} onChange={e => set('escalateAfterDays', +e.target.value)} min={1} max={60} />
+              <span style={{ fontSize: 11, color: 'var(--muted)' }}>días</span>
+            </div>
+          </Field>
+        </div>
 
         <Field label="Plan de pagos automático" hint="El agente puede proponer cuotas si detecta dificultades de pago">
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
@@ -227,6 +313,9 @@ export function Configuracion() {
             )}
           </div>
         </Field>
+
+        {/* Ejecución manual */}
+        <TestReminderButton />
       </Section>
 
       {/* Canales */}
