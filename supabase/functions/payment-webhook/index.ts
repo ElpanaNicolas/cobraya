@@ -122,7 +122,7 @@ async function sendPaymentConfirmationEmail(opts: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      from:    'Cobraya <pagos@cobraya.app>',
+      from:    'Cobraya <onboarding@resend.dev>',
       to:      [opts.clientEmail],
       subject: `✅ Pago confirmado — Factura ${opts.invoiceRef}`,
       html,
