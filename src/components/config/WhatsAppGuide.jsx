@@ -1,10 +1,12 @@
-// WhatsAppGuide — guía paso a paso para configurar WhatsApp Business
-// Muestra: estado de conexión + pasos numerados por proveedor + campos + test
+// WhatsAppSetupWizard — guía paso a paso para conectar Meta WhatsApp Cloud API
+// Flujo: explainer → crear app → credenciales → webhook → test
+// Twilio queda como opción "avanzada" para quienes ya lo tienen configurado.
 
 import { useState } from 'react'
 import { toast } from '@/components/ui/Toast'
 
-// ─── Helpers ───────────────────────────────────────────────────
+// ─── Utilidades ────────────────────────────────────────────────────────────────
+
 function CopyBox({ value, label }) {
   const copy = () => {
     navigator.clipboard.writeText(value)
@@ -21,7 +23,7 @@ function CopyBox({ value, label }) {
         padding: '0 14px', background: 'var(--surface2)', border: 'none',
         borderLeft: '1px solid var(--border2)', cursor: 'pointer',
         fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-ui)', fontWeight: 700,
-        transition: 'all .15s', whiteSpace: 'nowrap',
+        whiteSpace: 'nowrap',
       }}
         onMouseEnter={e => { e.currentTarget.style.background = 'rgba(45,158,95,0.1)'; e.currentTarget.style.color = 'var(--green-l)' }}
         onMouseLeave={e => { e.currentTarget.style.background = 'var(--surface2)'; e.currentTarget.style.color = 'var(--muted)' }}
@@ -32,134 +34,66 @@ function CopyBox({ value, label }) {
   )
 }
 
-function ExternalLink({ href, children }) {
+function ExtLink({ href, children }) {
   return (
-    <a href={href} target="_blank" rel="noreferrer" style={{
-      color: 'var(--green-l)', textDecoration: 'none', fontWeight: 600,
-    }}
+    <a href={href} target="_blank" rel="noreferrer" style={{ color: 'var(--green-l)', textDecoration: 'none', fontWeight: 600 }}
       onMouseEnter={e => e.currentTarget.style.textDecoration = 'underline'}
       onMouseLeave={e => e.currentTarget.style.textDecoration = 'none'}
     >{children} ↗</a>
   )
 }
 
-// ─── Paso numerado ──────────────────────────────────────────────
-function Step({ n, title, children, done }) {
-  return (
-    <div style={{ display: 'flex', gap: 14, marginBottom: 20 }}>
-      <div style={{
-        width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
-        background: done ? '#dcfce7' : 'var(--surface2)',
-        border: `2px solid ${done ? 'var(--green)' : 'var(--border2)'}`,
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 11, fontFamily: 'var(--font-ui)', fontWeight: 800,
-        color: done ? 'var(--green)' : 'var(--muted)',
-        transition: 'all .3s',
-      }}>
-        {done ? '✓' : n}
-      </div>
-      <div style={{ flex: 1 }}>
-        <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--white)', marginBottom: 6 }}>{title}</div>
-        <div style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.7 }}>{children}</div>
-      </div>
-    </div>
-  )
-}
-
-// ─── Badge de estado ────────────────────────────────────────────
-function StatusBadge({ status }) {
-  const config = {
-    connected:   { label: 'Conectado',         color: '#15803d', bg: '#dcfce7', icon: '✓' },
-    partial:     { label: 'Incompleto',        color: '#b45309', bg: '#fef3c7', icon: '⚠' },
-    disconnected:{ label: 'Sin configurar',    color: '#6b7280', bg: 'var(--surface2)', icon: '○' },
-  }
-  const c = config[status]
+// ─── Tarjeta de paso ───────────────────────────────────────────────────────────
+function StepCard({ n, total, title, subtitle, done, open, onToggle, children }) {
   return (
     <div style={{
-      display: 'inline-flex', alignItems: 'center', gap: 6,
-      padding: '4px 12px', borderRadius: 100,
-      background: c.bg, color: c.color,
-      fontSize: 11, fontFamily: 'var(--font-ui)', fontWeight: 700,
+      border: `1px solid ${done ? 'rgba(34,197,94,0.3)' : open ? 'rgba(45,158,95,0.4)' : 'var(--border)'}`,
+      borderRadius: 10,
+      background: done ? 'rgba(34,197,94,0.03)' : 'var(--surface2)',
+      overflow: 'hidden',
+      transition: 'border-color .2s',
     }}>
-      <span>{c.icon}</span> {c.label}
-    </div>
-  )
-}
-
-// ══════════════════════════════════════════════════════════════
-// GUÍA TWILIO
-// ══════════════════════════════════════════════════════════════
-function TwilioGuide({ webhookUrl, profile }) {
-  const hasSid    = !!profile?.twilioAccountSid
-  const hasToken  = !!profile?.twilioAuthToken
-  const hasNumber = !!profile?.twilioWaNumber
-
-  const status = (hasSid && hasToken && hasNumber) ? 'connected'
-    : (hasSid || hasToken || hasNumber) ? 'partial'
-    : 'disconnected'
-
-  const [open, setOpen] = useState(status !== 'connected')
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {/* Estado + toggle */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <StatusBadge status={status} />
-        <button onClick={() => setOpen(o => !o)} style={{
-          background: 'none', border: 'none', cursor: 'pointer',
-          fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-ui)',
-        }}>
-          {open ? '▲ Ocultar guía' : '▼ Ver instrucciones paso a paso'}
-        </button>
-      </div>
-
-      {/* Guía desplegable */}
-      {open && (
+      {/* Header */}
+      <button
+        type="button"
+        onClick={onToggle}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', gap: 14,
+          padding: '14px 18px', background: 'none', border: 'none',
+          cursor: 'pointer', textAlign: 'left',
+        }}
+      >
+        {/* Número */}
         <div style={{
-          padding: '20px', borderRadius: 10,
-          background: 'var(--surface2)', border: '1px solid var(--border)',
+          width: 30, height: 30, borderRadius: '50%', flexShrink: 0,
+          background: done ? 'rgba(34,197,94,0.15)' : 'var(--surface3)',
+          border: `2px solid ${done ? 'var(--green)' : 'var(--border2)'}`,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: done ? 14 : 11, fontFamily: 'var(--font-ui)', fontWeight: 800,
+          color: done ? 'var(--green)' : 'var(--muted)',
         }}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--white)', marginBottom: 16 }}>
-            Cómo conectar Twilio WhatsApp Sandbox (ideal para pruebas)
+          {done ? '✓' : n}
+        </div>
+
+        {/* Texto */}
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: done ? 'var(--green-l)' : 'var(--white)', fontFamily: 'var(--font-ui)' }}>
+            {title}
           </div>
+          {subtitle && (
+            <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 1 }}>{subtitle}</div>
+          )}
+        </div>
 
-          <Step n={1} title="Crear cuenta Twilio" done={hasSid}>
-            Entrá a <ExternalLink href="https://www.twilio.com/try-twilio">twilio.com</ExternalLink> y
-            registrarte gratis. No necesitás tarjeta de crédito para el sandbox.
-          </Step>
+        {/* Arrow */}
+        <div style={{ fontSize: 10, color: 'var(--muted)', transition: 'transform .2s', transform: open ? 'rotate(180deg)' : 'none' }}>▼</div>
+      </button>
 
-          <Step n={2} title="Activar WhatsApp Sandbox" done={hasSid}>
-            En la consola de Twilio: <strong style={{ color: 'var(--white)' }}>Messaging → Try it out → Send a WhatsApp message</strong>.
-            Seguí las instrucciones para unirte al sandbox desde tu celular.
-          </Step>
-
-          <Step n={3} title="Copiar Account SID y Auth Token" done={hasSid && hasToken}>
-            En la <ExternalLink href="https://console.twilio.com">consola de Twilio</ExternalLink> (página principal),
-            encontrás el <strong style={{ color: 'var(--white)' }}>Account SID</strong> (empieza con <code>AC</code>) y
-            el <strong style={{ color: 'var(--white)' }}>Auth Token</strong>. Copiá ambos y pegálos en los campos de abajo.
-          </Step>
-
-          <Step n={4} title="Copiar el número de sandbox" done={hasNumber}>
-            En <strong style={{ color: 'var(--white)' }}>Messaging → Sandbox for WhatsApp</strong> vas a ver
-            el número del sandbox (generalmente <code>+14155238886</code>). Copialo tal cual, con el <code>+</code>.
-          </Step>
-
-          <Step n={5} title="Configurar el webhook" done={hasSid && hasNumber}>
-            En esa misma pantalla del Sandbox, en el campo
-            {' '}<strong style={{ color: 'var(--white)' }}>"WHEN A MESSAGE COMES IN"</strong>, pegá esta URL:
-            <div style={{ marginTop: 8 }}>
-              <CopyBox value={webhookUrl} label="URL del webhook" />
-            </div>
-          </Step>
-
-          <div style={{
-            marginTop: 4, padding: '10px 14px', borderRadius: 8,
-            background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)',
-            fontSize: 11, color: 'var(--muted)',
-          }}>
-            💡 <strong style={{ color: 'var(--white)' }}>Nota:</strong> el sandbox es para probar.
-            Para producción real necesitás un número de Twilio con WhatsApp habilitado (hay un costo mensual).
-            O bien pasate a <strong style={{ color: 'var(--white)' }}>Meta WhatsApp Cloud API</strong> arriba.
+      {/* Contenido */}
+      {open && (
+        <div style={{ padding: '0 18px 18px', borderTop: '1px solid var(--border)' }}>
+          <div style={{ paddingTop: 16, fontSize: 12, color: 'var(--muted)', lineHeight: 1.8 }}>
+            {children}
           </div>
         </div>
       )}
@@ -167,129 +101,255 @@ function TwilioGuide({ webhookUrl, profile }) {
   )
 }
 
-// ══════════════════════════════════════════════════════════════
-// GUÍA META
-// ══════════════════════════════════════════════════════════════
-function MetaGuide({ webhookUrl, profile }) {
-  const hasPhoneId = !!profile?.metaPhoneNumberId
-  const hasToken   = !!profile?.metaAccessToken
-  const hasWaba    = !!profile?.metaWabaId
-  const hasVerify  = !!profile?.metaVerifyToken
+// ─── Barra de progreso ─────────────────────────────────────────────────────────
+function ProgressBar({ steps, current }) {
+  const done = steps.filter(s => s.done).length
+  const pct  = Math.round((done / steps.length) * 100)
 
-  const status = (hasPhoneId && hasToken && hasVerify) ? 'connected'
-    : (hasPhoneId || hasToken) ? 'partial'
-    : 'disconnected'
-
-  const [open, setOpen] = useState(status !== 'connected')
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      {/* Estado + toggle */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <StatusBadge status={status} />
-        <button onClick={() => setOpen(o => !o)} style={{
-          background: 'none', border: 'none', cursor: 'pointer',
-          fontSize: 11, color: 'var(--muted)', fontFamily: 'var(--font-ui)',
-        }}>
-          {open ? '▲ Ocultar guía' : '▼ Ver instrucciones paso a paso'}
-        </button>
-      </div>
-
-      {/* Guía desplegable */}
-      {open && (
-        <div style={{
-          padding: '20px', borderRadius: 10,
-          background: 'var(--surface2)', border: '1px solid var(--border)',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 16 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--white)' }}>
-              Cómo conectar Meta WhatsApp Cloud API (producción)
-            </div>
-            <a
-              href="https://www.youtube.com/results?search_query=meta+whatsapp+cloud+api+setup+tutorial"
-              target="_blank" rel="noreferrer"
-              style={{ fontSize: 10, color: '#9b8cff', textDecoration: 'none', whiteSpace: 'nowrap', marginLeft: 12 }}
-            >▶ Ver tutorial en YouTube</a>
-          </div>
-
-          <Step n={1} title="Crear app en Meta for Developers" done={hasPhoneId}>
-            Entrá a <ExternalLink href="https://developers.facebook.com/apps">developers.facebook.com/apps</ExternalLink>,
-            hacé clic en <strong style={{ color: 'var(--white)' }}>Crear app</strong>,
-            seleccioná tipo <strong style={{ color: 'var(--white)' }}>Empresa (Business)</strong> y seguí el wizard.
-          </Step>
-
-          <Step n={2} title="Agregar el producto WhatsApp" done={hasPhoneId}>
-            Dentro de tu app, hacé clic en <strong style={{ color: 'var(--white)' }}>Agregar producto</strong>
-            {' '}→ <strong style={{ color: 'var(--white)' }}>WhatsApp</strong> → Configurar.
-            Asociala a tu cuenta de Meta Business.
-          </Step>
-
-          <Step n={3} title="Obtener Phone Number ID y WABA ID" done={hasPhoneId && hasWaba}>
-            En el panel izquierdo: <strong style={{ color: 'var(--white)' }}>WhatsApp → Configuración API</strong>.
-            Ahí vas a ver:
-            <ul style={{ margin: '8px 0 0', paddingLeft: 18, listStyle: 'disc' }}>
-              <li><strong style={{ color: 'var(--white)' }}>Phone Number ID</strong> — número largo debajo del teléfono de prueba</li>
-              <li><strong style={{ color: 'var(--white)' }}>WhatsApp Business Account ID (WABA ID)</strong> — también en esa misma pantalla</li>
-            </ul>
-            Copiá ambos en los campos de abajo.
-          </Step>
-
-          <Step n={4} title="Generar Access Token permanente" done={hasToken}>
-            Ve a <ExternalLink href="https://business.facebook.com/settings/system-users">Meta Business Manager → Usuarios del sistema</ExternalLink>.
-            <br />Creá un usuario del sistema → asignale tu app → generá un token con permisos
-            {' '}<code>whatsapp_business_messaging</code> y <code>whatsapp_business_management</code>.
-            <br /><strong style={{ color: '#f87171' }}>Importante:</strong> guardá el token en el momento — no se puede ver de nuevo.
-          </Step>
-
-          <Step n={5} title="Definir tu Verify Token" done={hasVerify}>
-            Elegí cualquier texto secreto (ej: <code>cobraya-webhook-2025</code>) y ponelo en el campo
-            {' '}<strong style={{ color: 'var(--white)' }}>Verify Token</strong> de abajo. Lo vas a necesitar en el siguiente paso.
-          </Step>
-
-          <Step n={6} title="Configurar el webhook en Meta" done={hasPhoneId && hasVerify}>
-            En <strong style={{ color: 'var(--white)' }}>WhatsApp → Configuración → Webhooks</strong>, hacé clic en
-            {' '}<strong style={{ color: 'var(--white)' }}>Editar</strong> y pegá:
-            <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <div>
-                <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 4, fontFamily: 'var(--font-ui)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em' }}>URL de devolución de llamada</div>
-                <CopyBox value={webhookUrl} label="Webhook URL" />
-              </div>
-              <div>
-                <div style={{ fontSize: 10, color: 'var(--muted)', marginBottom: 4, fontFamily: 'var(--font-ui)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em' }}>Token de verificación</div>
-                <CopyBox value={profile?.metaVerifyToken || '← completá el campo Verify Token primero'} label="Verify Token" />
-              </div>
-            </div>
-            <div style={{ marginTop: 10 }}>
-              Luego hacé clic en <strong style={{ color: 'var(--white)' }}>Verificar y guardar</strong>,
-              después en <strong style={{ color: 'var(--white)' }}>Suscribirse a los campos</strong> y activá
-              {' '}<code>messages</code>.
-            </div>
-          </Step>
-
-          <div style={{
-            padding: '10px 14px', borderRadius: 8,
-            background: 'rgba(76,175,125,0.08)', border: '1px solid rgba(76,175,125,0.2)',
-            fontSize: 11, color: 'var(--muted)',
-          }}>
-            ✅ <strong style={{ color: 'var(--white)' }}>¿Todo listo?</strong> Guardá los cambios arriba y
-            enviá un mensaje de WhatsApp al número que configuraste. Deberías ver la respuesta automática del agente.
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ══════════════════════════════════════════════════════════════
-// COMPONENTE PRINCIPAL
-// ══════════════════════════════════════════════════════════════
-export function WhatsAppGuide({ provider, profile, webhookTwilio, webhookMeta }) {
   return (
     <div>
-      {provider === 'twilio'
-        ? <TwilioGuide webhookUrl={webhookTwilio} profile={profile} />
-        : <MetaGuide   webhookUrl={webhookMeta}   profile={profile} />
-      }
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+        <span style={{ fontSize: 10, fontFamily: 'var(--font-ui)', fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '.08em' }}>
+          Configuración WhatsApp
+        </span>
+        <span style={{ fontSize: 10, color: done === steps.length ? 'var(--green-l)' : 'var(--muted)', fontFamily: 'var(--font-ui)', fontWeight: 700 }}>
+          {done === steps.length ? '✓ Completo' : `${done} / ${steps.length} pasos`}
+        </span>
+      </div>
+      <div style={{ height: 4, borderRadius: 2, background: 'var(--surface3)', overflow: 'hidden' }}>
+        <div style={{
+          height: '100%', borderRadius: 2,
+          background: done === steps.length ? 'var(--green)' : 'var(--green-l)',
+          width: `${pct}%`, transition: 'width .4s ease',
+        }} />
+      </div>
+    </div>
+  )
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// WIZARD PRINCIPAL — Meta Cloud API
+// ══════════════════════════════════════════════════════════════════════════════
+export function WhatsAppGuide({ provider, profile, webhookMeta, webhookTwilio }) {
+  const [openStep, setOpenStep] = useState(null)
+
+  const hasPhoneId  = !!profile?.metaPhoneNumberId
+  const hasToken    = !!profile?.metaAccessToken
+  const hasVerify   = !!profile?.metaVerifyToken
+  const hasWebhook  = hasPhoneId && hasVerify  // proxy: si tiene todo, el webhook probablemente está configurado
+
+  const isTwilio = provider === 'twilio'
+
+  // Para Twilio — estado simple
+  const hasTwilioSid    = !!profile?.twilioAccountSid
+  const hasTwilioToken  = !!profile?.twilioAuthToken
+  const hasTwilioNumber = !!profile?.twilioWaNumber
+  const twilioConnected = hasTwilioSid && hasTwilioToken && hasTwilioNumber
+
+  const steps = [
+    { id: 'app',    title: 'Crear app en Meta for Developers',  done: hasPhoneId },
+    { id: 'creds',  title: 'Obtener credenciales',              done: hasPhoneId && hasToken },
+    { id: 'verify', title: 'Definir Verify Token',              done: hasVerify },
+    { id: 'webhook',title: 'Configurar webhook en Meta',        done: hasWebhook && hasToken },
+  ]
+
+  const toggle = (id) => setOpenStep(s => s === id ? null : id)
+
+  // ─── Vista Twilio (legacy/avanzado) ────────────────────────────────────────
+  if (isTwilio) {
+    return (
+      <div style={{
+        padding: '14px 16px', borderRadius: 8,
+        background: 'rgba(251,191,36,0.05)', border: '1px solid rgba(251,191,36,0.2)',
+        fontSize: 11, color: 'var(--muted)', lineHeight: 1.6,
+      }}>
+        <div style={{ fontWeight: 700, color: '#fbbf24', marginBottom: 6 }}>⚠️ Twilio Sandbox — solo para pruebas</div>
+        <p style={{ margin: '0 0 8px' }}>
+          El sandbox de Twilio requiere que cada destinatario envíe primero <code>join [palabra]</code> al número. Esto
+          <strong style={{ color: 'var(--white)' }}> no es viable en producción</strong> — tus clientes (deudores) no van a hacer eso.
+        </p>
+        <p style={{ margin: 0 }}>
+          Para producción real usá <strong style={{ color: 'var(--white)' }}>Meta WhatsApp Cloud API</strong> (opción de arriba). Es gratis hasta 1.000 conversaciones/mes.
+        </p>
+        {twilioConnected && (
+          <div style={{ marginTop: 12, padding: '8px 12px', borderRadius: 6, background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.2)', fontSize: 10, color: 'var(--green-l)', fontWeight: 700 }}>
+            ✓ Twilio configurado — podés probar el agente pero tus clientes deberán hacer opt-in primero.
+          </div>
+        )}
+        <div style={{ marginTop: 12, fontSize: 10, color: 'var(--muted2)' }}>
+          Webhook URL: <code style={{ color: 'var(--muted)', userSelect: 'all' }}>{webhookTwilio}</code>
+        </div>
+      </div>
+    )
+  }
+
+  // ─── Vista Meta (principal) ────────────────────────────────────────────────
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+
+      {/* Explicación de cómo funciona para los clientes */}
+      <div style={{
+        padding: '14px 16px', borderRadius: 8,
+        background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.2)',
+        display: 'flex', gap: 12, alignItems: 'flex-start',
+      }}>
+        <span style={{ fontSize: 22, flexShrink: 0 }}>📲</span>
+        <div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--green-l)', marginBottom: 4 }}>
+            Tus clientes no necesitan hacer nada
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--muted)', lineHeight: 1.6 }}>
+            Una vez que conectes tu número, Cobraya le manda WhatsApp a cada deudor directamente.
+            Ellos reciben el mensaje y responden como con cualquier contacto — sin registrarse, sin códigos, sin apps nuevas.
+          </div>
+        </div>
+      </div>
+
+      {/* Barra de progreso */}
+      <ProgressBar steps={steps} />
+
+      {/* Pasos */}
+      <StepCard
+        n={1} total={4}
+        title="Crear una app en Meta for Developers"
+        subtitle="Una vez — tarda ~3 minutos"
+        done={hasPhoneId}
+        open={openStep === 'app'}
+        onToggle={() => toggle('app')}
+      >
+        <ol style={{ margin: '0 0 12px', paddingLeft: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <li>Entrá a <ExtLink href="https://developers.facebook.com/apps">developers.facebook.com/apps</ExtLink></li>
+          <li>Hacé clic en <Chip>Crear app</Chip></li>
+          <li>Tipo de app: <Chip>Empresa (Business)</Chip> → Siguiente</li>
+          <li>Ponele cualquier nombre (ej: "Cobraya"), vinculate a tu cuenta de Facebook y creá la app</li>
+        </ol>
+        <Note>Si ya tenés una app de Meta con WhatsApp, podés usarla directamente.</Note>
+      </StepCard>
+
+      <StepCard
+        n={2} total={4}
+        title="Obtener Phone Number ID y Access Token"
+        subtitle="Los datos que conectan Cobraya con tu número"
+        done={hasPhoneId && hasToken}
+        open={openStep === 'creds'}
+        onToggle={() => toggle('creds')}
+      >
+        <ol style={{ margin: '0 0 12px', paddingLeft: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <li>Dentro de tu app en Meta: panel izquierdo → <Chip>WhatsApp</Chip> → <Chip>Agregar producto</Chip></li>
+          <li>Asociala a tu cuenta de <strong style={{ color: 'var(--white)' }}>Meta Business</strong> (la creás en el momento si no tenés)</li>
+          <li>
+            En <strong style={{ color: 'var(--white)' }}>WhatsApp → Configuración API</strong> vas a ver:
+            <ul style={{ marginTop: 6, paddingLeft: 18, listStyle: 'disc', display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <li><strong style={{ color: 'var(--white)' }}>Phone Number ID</strong> — número largo bajo el teléfono de prueba → copialo en el campo de abajo</li>
+              <li><strong style={{ color: 'var(--white)' }}>WhatsApp Business Account ID</strong> — también en esa pantalla → campo WABA ID</li>
+            </ul>
+          </li>
+          <li>
+            Para el <strong style={{ color: 'var(--white)' }}>Access Token permanente</strong>: ir a{' '}
+            <ExtLink href="https://business.facebook.com/settings/system-users">Meta Business Manager → Usuarios del sistema</ExtLink>
+            {' '}→ Crear usuario de sistema → asignar tu app → generar token con permisos{' '}
+            <code>whatsapp_business_messaging</code> y <code>whatsapp_business_management</code>
+          </li>
+        </ol>
+        <Note color="amber">Guardá el Access Token apenas lo generás — Meta no te lo muestra de nuevo.</Note>
+      </StepCard>
+
+      <StepCard
+        n={3} total={4}
+        title="Definir tu Verify Token"
+        subtitle="Una contraseña que vos elegís para asegurar el webhook"
+        done={hasVerify}
+        open={openStep === 'verify'}
+        onToggle={() => toggle('verify')}
+      >
+        <p style={{ margin: '0 0 10px' }}>
+          El Verify Token es un texto secreto que vos elegís (cualquier cosa, como una contraseña).{' '}
+          Escrib&iacute;lo en el campo <strong style={{ color: 'var(--white)' }}>Verify Token</strong> de abajo y guardá los cambios.
+          Lo vas a necesitar en el siguiente paso.
+        </p>
+        <p style={{ margin: 0, fontSize: 11 }}>Ejemplo: <code style={{ color: 'var(--green-l)' }}>mi-empresa-cobraya-2025</code></p>
+      </StepCard>
+
+      <StepCard
+        n={4} total={4}
+        title="Configurar el webhook en Meta"
+        subtitle="Le decís a Meta a dónde mandar los mensajes de tus clientes"
+        done={hasWebhook && hasToken}
+        open={openStep === 'webhook'}
+        onToggle={() => toggle('webhook')}
+      >
+        <ol style={{ margin: '0 0 14px', paddingLeft: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <li>En tu app de Meta: <Chip>WhatsApp</Chip> → <Chip>Configuración</Chip> → <Chip>Webhooks</Chip></li>
+          <li>Hacé clic en <Chip>Editar</Chip> y pegá esta URL:</li>
+        </ol>
+
+        <div style={{ marginBottom: 12 }}>
+          <div style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--font-ui)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>URL de devolución de llamada</div>
+          <CopyBox value={webhookMeta} label="Webhook URL" />
+        </div>
+
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--font-ui)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.06em', marginBottom: 6 }}>
+            Token de verificación {!hasVerify && <span style={{ color: '#f87171', textTransform: 'none', fontWeight: 400 }}>— completá el Verify Token en el paso 3 primero</span>}
+          </div>
+          <CopyBox
+            value={profile?.metaVerifyToken || '← completá el Verify Token en el paso 3'}
+            label="Verify Token"
+          />
+        </div>
+
+        <ol style={{ margin: '0 0 14px', paddingLeft: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <li>Hacé clic en <Chip>Verificar y guardar</Chip></li>
+          <li>Luego en <Chip>Suscribirse a los campos</Chip> → activá <code>messages</code></li>
+        </ol>
+
+        <Note color="green">
+          ¡Listo! Guardá los cambios de arriba y enviá un WhatsApp al número que configuraste — el agente debería responder automáticamente.
+        </Note>
+      </StepCard>
+
+      {/* Link a tutorial de YouTube */}
+      <div style={{ textAlign: 'center', paddingTop: 4 }}>
+        <a
+          href="https://www.youtube.com/results?search_query=meta+whatsapp+cloud+api+setup+2024"
+          target="_blank" rel="noreferrer"
+          style={{ fontSize: 11, color: 'var(--muted)', textDecoration: 'none' }}
+          onMouseEnter={e => e.currentTarget.style.color = 'var(--white)'}
+          onMouseLeave={e => e.currentTarget.style.color = 'var(--muted)'}
+        >
+          ▶ ¿Preferís ver un video? Buscá "Meta WhatsApp Cloud API setup" en YouTube — hay tutoriales de 10 minutos
+        </a>
+      </div>
+    </div>
+  )
+}
+
+// ─── Helpers de UI menores ─────────────────────────────────────────────────────
+function Chip({ children }) {
+  return (
+    <span style={{
+      display: 'inline-block', padding: '1px 8px', borderRadius: 4,
+      background: 'var(--surface3)', border: '1px solid var(--border2)',
+      fontSize: 10, fontFamily: 'var(--font-ui)', fontWeight: 700,
+      color: 'var(--white)', verticalAlign: 'baseline',
+    }}>{children}</span>
+  )
+}
+
+function Note({ children, color = 'blue' }) {
+  const colors = {
+    blue:  { bg: 'rgba(59,130,246,0.08)',  border: 'rgba(59,130,246,0.2)',  text: '#93c5fd' },
+    green: { bg: 'rgba(34,197,94,0.08)',   border: 'rgba(34,197,94,0.2)',   text: 'var(--green-l)' },
+    amber: { bg: 'rgba(251,191,36,0.08)',  border: 'rgba(251,191,36,0.2)',  text: '#fbbf24' },
+  }
+  const c = colors[color] || colors.blue
+  return (
+    <div style={{
+      padding: '10px 14px', borderRadius: 7,
+      background: c.bg, border: `1px solid ${c.border}`,
+      fontSize: 11, color: c.text, lineHeight: 1.6,
+    }}>
+      {children}
     </div>
   )
 }

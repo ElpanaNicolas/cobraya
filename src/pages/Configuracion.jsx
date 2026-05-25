@@ -519,67 +519,93 @@ export function Configuracion() {
         </div>
       </Section>
 
-      {/* WhatsApp — selector de proveedor */}
-      <Section title="Conexión WhatsApp" subtitle="Conectá tu número de WhatsApp Business para enviar mensajes automáticos">
+      {/* WhatsApp */}
+      <Section
+        title="Conexión WhatsApp"
+        subtitle="Conectá tu número de WhatsApp Business — tus clientes no necesitan hacer nada"
+      >
 
-        {/* Toggle Twilio / Meta */}
+        {/* Selector de proveedor */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
-          {[
-            { id: 'twilio', label: '🧪 Twilio Sandbox',            desc: 'Ideal para probar sin costo' },
-            { id: 'meta',   label: '✅ Meta WhatsApp Cloud API',   desc: 'Producción — número propio' },
-          ].map(p => (
-            <div key={p.id} onClick={() => setProfile(pr => ({ ...pr, waProvider: p.id }))} style={{
-              flex: 1, padding: '10px 14px', borderRadius: 8, cursor: 'pointer',
-              background: profile?.waProvider === p.id ? 'rgba(45,158,95,0.08)' : 'var(--surface2)',
-              border: `1.5px solid ${profile?.waProvider === p.id ? 'var(--green-l)' : 'var(--border)'}`,
-              transition: 'all .15s',
-            }}>
-              <div style={{ fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-ui)', color: profile?.waProvider === p.id ? 'var(--green-l)' : 'var(--white)' }}>{p.label}</div>
-              <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>{p.desc}</div>
+          {/* Meta — opción principal */}
+          <div
+            onClick={() => setProfile(pr => ({ ...pr, waProvider: 'meta' }))}
+            style={{
+              flex: 2, padding: '12px 16px', borderRadius: 8, cursor: 'pointer',
+              background: (profile?.waProvider ?? 'meta') === 'meta' ? 'rgba(45,158,95,0.08)' : 'var(--surface2)',
+              border: `1.5px solid ${(profile?.waProvider ?? 'meta') === 'meta' ? 'var(--green-l)' : 'var(--border)'}`,
+              transition: 'all .15s', position: 'relative',
+            }}
+          >
+            {/* Badge recomendado */}
+            <span style={{
+              position: 'absolute', top: 8, right: 10,
+              fontSize: 8, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase',
+              background: 'rgba(45,158,95,0.15)', color: 'var(--green-l)',
+              border: '1px solid rgba(45,158,95,0.3)', borderRadius: 4, padding: '1px 6px',
+            }}>RECOMENDADO</span>
+            <div style={{ fontSize: 13, fontWeight: 700, fontFamily: 'var(--font-ui)', color: (profile?.waProvider ?? 'meta') === 'meta' ? 'var(--green-l)' : 'var(--white)', marginBottom: 2 }}>
+              ✅ Meta WhatsApp Cloud API
             </div>
-          ))}
+            <div style={{ fontSize: 10, color: 'var(--muted)' }}>Producción real · tu número propio · gratis hasta 1.000 conv/mes</div>
+          </div>
+
+          {/* Twilio — opción avanzada */}
+          <div
+            onClick={() => setProfile(pr => ({ ...pr, waProvider: 'twilio' }))}
+            style={{
+              flex: 1, padding: '12px 14px', borderRadius: 8, cursor: 'pointer',
+              background: profile?.waProvider === 'twilio' ? 'rgba(251,191,36,0.06)' : 'var(--surface2)',
+              border: `1.5px solid ${profile?.waProvider === 'twilio' ? 'rgba(251,191,36,0.4)' : 'var(--border)'}`,
+              transition: 'all .15s',
+            }}
+          >
+            <div style={{ fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-ui)', color: profile?.waProvider === 'twilio' ? '#fbbf24' : 'var(--muted)', marginBottom: 2 }}>
+              🧪 Twilio
+            </div>
+            <div style={{ fontSize: 10, color: 'var(--muted2)' }}>Solo para pruebas</div>
+          </div>
         </div>
 
-        {/* Guía visual + campos */}
+        {/* Wizard / guía */}
         <WhatsAppGuide
-          provider={profile?.waProvider ?? 'twilio'}
+          provider={profile?.waProvider ?? 'meta'}
           profile={profile}
           webhookTwilio={`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-inbound`}
           webhookMeta={`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/whatsapp-meta-inbound`}
         />
 
-        {/* Campos — Twilio */}
-        {profile?.waProvider !== 'meta' && (
-          <div className="config-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 20 }}>
-            <Field label="Account SID" hint="Empieza con AC...">
-              <Input value={profile?.twilioAccountSid ?? ''} onChange={e => setProfile(p => ({ ...p, twilioAccountSid: e.target.value }))} placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" />
-            </Field>
-            <Field label="Auth Token" hint="Se guarda de forma segura">
-              <Input value={profile?.twilioAuthToken ?? ''} onChange={e => setProfile(p => ({ ...p, twilioAuthToken: e.target.value }))} placeholder="••••••••••••••••••••••••••••••••" type="password" />
-            </Field>
-            <Field label="Número de WhatsApp" hint="Con código de país, ej: +14155238886">
-              <Input value={profile?.twilioWaNumber ?? ''} onChange={e => setProfile(p => ({ ...p, twilioWaNumber: e.target.value }))} placeholder="+14155238886" />
-            </Field>
-          </div>
-        )}
-
-        {/* Campos — Meta */}
-        {profile?.waProvider === 'meta' && (
-          <div className="config-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginTop: 20 }}>
-            <Field label="Phone Number ID" hint="ID numérico del número en Meta">
-              <Input value={profile?.metaPhoneNumberId ?? ''} onChange={e => setProfile(p => ({ ...p, metaPhoneNumberId: e.target.value }))} placeholder="123456789012345" />
-            </Field>
-            <Field label="WABA ID" hint="WhatsApp Business Account ID">
-              <Input value={profile?.metaWabaId ?? ''} onChange={e => setProfile(p => ({ ...p, metaWabaId: e.target.value }))} placeholder="123456789012345" />
-            </Field>
-            <Field label="Access Token" hint="Token permanente del sistema">
-              <Input value={profile?.metaAccessToken ?? ''} onChange={e => setProfile(p => ({ ...p, metaAccessToken: e.target.value }))} placeholder="EAAxxxxxxxxxx..." type="password" />
-            </Field>
-            <Field label="Verify Token" hint="Elegís vos — lo usás al configurar el webhook en Meta">
-              <Input value={profile?.metaVerifyToken ?? ''} onChange={e => setProfile(p => ({ ...p, metaVerifyToken: e.target.value }))} placeholder="mi-token-secreto-123" />
-            </Field>
-          </div>
-        )}
+        {/* Campos de credenciales */}
+        <div style={{ marginTop: 20 }}>
+          {(profile?.waProvider ?? 'meta') === 'meta' ? (
+            <div className="config-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <Field label="Phone Number ID" hint="ID numérico del número en Meta">
+                <Input value={profile?.metaPhoneNumberId ?? ''} onChange={e => setProfile(p => ({ ...p, metaPhoneNumberId: e.target.value }))} placeholder="123456789012345" />
+              </Field>
+              <Field label="WABA ID" hint="WhatsApp Business Account ID">
+                <Input value={profile?.metaWabaId ?? ''} onChange={e => setProfile(p => ({ ...p, metaWabaId: e.target.value }))} placeholder="123456789012345" />
+              </Field>
+              <Field label="Access Token" hint="Token permanente — se guarda de forma segura">
+                <Input value={profile?.metaAccessToken ?? ''} onChange={e => setProfile(p => ({ ...p, metaAccessToken: e.target.value }))} placeholder="EAAxxxxxxxxxx..." type="password" />
+              </Field>
+              <Field label="Verify Token" hint="Texto secreto que elegís vos (paso 3 del wizard)">
+                <Input value={profile?.metaVerifyToken ?? ''} onChange={e => setProfile(p => ({ ...p, metaVerifyToken: e.target.value }))} placeholder="mi-empresa-cobraya-2025" />
+              </Field>
+            </div>
+          ) : (
+            <div className="config-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <Field label="Account SID" hint="Empieza con AC...">
+                <Input value={profile?.twilioAccountSid ?? ''} onChange={e => setProfile(p => ({ ...p, twilioAccountSid: e.target.value }))} placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" />
+              </Field>
+              <Field label="Auth Token" hint="Se guarda de forma segura">
+                <Input value={profile?.twilioAuthToken ?? ''} onChange={e => setProfile(p => ({ ...p, twilioAuthToken: e.target.value }))} placeholder="••••••••••••••••••••••••••••••••" type="password" />
+              </Field>
+              <Field label="Número de WhatsApp Sandbox" hint="Con código de país, ej: +14155238886">
+                <Input value={profile?.twilioWaNumber ?? ''} onChange={e => setProfile(p => ({ ...p, twilioWaNumber: e.target.value }))} placeholder="+14155238886" />
+              </Field>
+            </div>
+          )}
+        </div>
       </Section>
 
       {/* Métodos de pago */}
