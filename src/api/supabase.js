@@ -11,6 +11,23 @@ function check(error) {
 
 export const api = {
 
+  // ── Resolución de identidad ───────────────────────────────────────────────
+  // Devuelve { userId, profileId } donde profileId es el del propietario
+  // si el usuario actual es miembro del equipo, o su propio id si es dueño.
+  async _me() {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('No autenticado')
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('id, parent_profile_id')
+      .eq('id', user.id)
+      .single()
+    return {
+      userId:    user.id,
+      profileId: profile?.parent_profile_id ?? user.id,
+    }
+  },
+
   async getUser() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('No autenticado')
@@ -59,11 +76,11 @@ export const api = {
   },
 
   async getKPIs() {
-    const { data: { user } } = await supabase.auth.getUser()
+    const { profileId } = await api._me()
     const { data, error } = await supabase
       .from('invoices')
       .select('amount, status, issued, due')
-      .eq('profile_id', user.id)
+      .eq('profile_id', profileId)
     check(error)
 
     const now = new Date()
@@ -95,11 +112,11 @@ export const api = {
   },
 
   async getInvoices() {
-    const { data: { user } } = await supabase.auth.getUser()
+    const { profileId } = await api._me()
     const { data, error } = await supabase
       .from('invoices')
       .select('*, clients(id, name, rut, phone)')
-      .eq('profile_id', user.id)
+      .eq('profile_id', profileId)
       .order('created_at', { ascending: false })
     check(error)
 
@@ -119,12 +136,12 @@ export const api = {
   },
 
   async getActivity() {
-    const { data: { user } } = await supabase.auth.getUser()
+    const { profileId } = await api._me()
     // Primero traemos las conversaciones del usuario
     const { data: convs } = await supabase
       .from('conversations')
       .select('id, clients(name)')
-      .eq('profile_id', user.id)
+      .eq('profile_id', profileId)
     const convIds = (convs ?? []).map(c => c.id)
     if (!convIds.length) return []
 
@@ -149,11 +166,11 @@ export const api = {
   },
 
   async getChartData() {
-    const { data: { user } } = await supabase.auth.getUser()
+    const { profileId } = await api._me()
     const { data, error } = await supabase
       .from('invoices')
       .select('amount, status, issued')
-      .eq('profile_id', user.id)
+      .eq('profile_id', profileId)
     check(error)
 
     const months = {}
@@ -176,11 +193,11 @@ export const api = {
   },
 
   async getClients() {
-    const { data: { user } } = await supabase.auth.getUser()
+    const { profileId } = await api._me()
     const { data, error } = await supabase
       .from('clients')
       .select('*, invoices(amount, status, issued, due)')
-      .eq('profile_id', user.id)
+      .eq('profile_id', profileId)
       .order('name')
     check(error)
 
@@ -212,12 +229,12 @@ export const api = {
   },
 
   async getConversations(clientId) {
-    const { data: { user } } = await supabase.auth.getUser()
+    const { profileId } = await api._me()
 
     let query = supabase
       .from('conversations')
       .select('*, clients(name, phone), invoices(cfe_id, amount), messages(id, from_role, body, status, sent_at)')
-      .eq('profile_id', user.id)
+      .eq('profile_id', profileId)
       .order('sent_at', { ascending: true, foreignTable: 'messages' })
 
     if (clientId) query = query.eq('client_id', clientId)
@@ -249,26 +266,26 @@ export const api = {
   },
 
   async getAgentConfig() {
-    const { data: { user } } = await supabase.auth.getUser()
+    const { userId, profileId } = await api._me()
 
     // maybeSingle para no lanzar error si el usuario aún no tiene fila
     let { data } = await supabase
       .from('agent_config')
       .select('*')
-      .eq('profile_id', user.id)
+      .eq('profile_id', profileId)
       .maybeSingle()
 
     // Si no existe la fila, crear una con valores por defecto
     if (!data) {
       const { data: created } = await supabase
         .from('agent_config')
-        .insert({ profile_id: user.id })
+        .insert({ profile_id: profileId })
         .select('*')
         .single()
       data = created
     }
 
-    const { data: profile } = await supabase.from('profiles').select('whatsapp, signature').eq('id', user.id).single()
+    const { data: profile } = await supabase.from('profiles').select('whatsapp, signature').eq('id', profileId).single()
 
     return {
       enabled:                 data?.enabled                  ?? true,
@@ -294,13 +311,13 @@ export const api = {
   },
 
   async saveAgentConfig(config) {
-    const { data: { user } } = await supabase.auth.getUser()
+    const { profileId } = await api._me()
 
     // upsert en lugar de update para soportar usuarios sin fila previa
     const { error } = await supabase
       .from('agent_config')
       .upsert({
-        profile_id:               user.id,
+        profile_id:               profileId,
         enabled:                  config.enabled,
         tone:                     config.tone,
         first_reminder_days:      config.firstReminderDays,
@@ -319,7 +336,7 @@ export const api = {
     await supabase.from('profiles').update({
       whatsapp:  config.whatsappNumber,
       signature: config.signature,
-    }).eq('id', user.id)
+    }).eq('id', profileId)
 
     check(error)
     return { ok: true }
@@ -373,10 +390,10 @@ export const api = {
   },
 
   async createClient({ name, rut, phone, email }) {
-    const { data: { user } } = await supabase.auth.getUser()
+    const { profileId } = await api._me()
     const { data, error } = await supabase
       .from('clients')
-      .insert({ profile_id: user.id, name, rut, phone, email })
+      .insert({ profile_id: profileId, name, rut, phone, email })
       .select()
       .single()
     check(error)
@@ -384,11 +401,11 @@ export const api = {
   },
 
   async createInvoice({ clientId, cfeId, amount, issued, due, channel }) {
-    const { data: { user } } = await supabase.auth.getUser()
+    const { profileId } = await api._me()
     const { data, error } = await supabase
       .from('invoices')
       .insert({
-        profile_id: user.id,
+        profile_id: profileId,
         client_id:  clientId,
         cfe_id:     cfeId,
         amount,
@@ -448,13 +465,13 @@ export const api = {
 
   async importInvoices(rows) {
     // rows: [{ clientName, rut, phone, email, cfeId, amount, issued, due }]
-    const { data: { user } } = await supabase.auth.getUser()
+    const { profileId } = await api._me()
 
     // 1. Traer clientes existentes
     const { data: existingClients } = await supabase
       .from('clients')
       .select('id, name, rut, phone, email')
-      .eq('profile_id', user.id)
+      .eq('profile_id', profileId)
 
     const clientMap = {}
     for (const c of existingClients ?? []) {
@@ -474,7 +491,7 @@ export const api = {
         if (!clientId) {
           const { data: newClient, error: ce } = await supabase
             .from('clients')
-            .insert({ profile_id: user.id, name: row.clientName, rut: row.rut, phone: row.phone, email: row.email })
+            .insert({ profile_id: profileId, name: row.clientName, rut: row.rut, phone: row.phone, email: row.email })
             .select('id').single()
           if (ce) throw new Error(ce.message)
           clientId = newClient.id
@@ -484,7 +501,7 @@ export const api = {
 
         // 3. Crear factura
         const { error: ie } = await supabase.from('invoices').insert({
-          profile_id: user.id,
+          profile_id: profileId,
           client_id:  clientId,
           cfe_id:     row.cfeId,
           amount:     parseFloat(row.amount),
@@ -504,11 +521,11 @@ export const api = {
   },
 
   async getUnreadCount() {
-    const { data: { user } } = await supabase.auth.getUser()
+    const { profileId } = await api._me()
     const { data: convs } = await supabase
       .from('conversations')
       .select('id')
-      .eq('profile_id', user.id)
+      .eq('profile_id', profileId)
     if (!convs?.length) return 0
     const ids = convs.map(c => c.id)
     const { count } = await supabase
@@ -565,5 +582,137 @@ export const api = {
       .eq('id', user.id)
     check(error)
     return { ok: true }
+  },
+
+  // ── Equipo (multi-usuario) ────────────────────────────────────────────────
+
+  async getTeam() {
+    const { userId, profileId } = await api._me()
+    // Solo el propietario puede ver el equipo
+    if (userId !== profileId) return { members: [], invitations: [] }
+
+    // Miembros activos (profiles con parent_profile_id = mi id)
+    const { data: members } = await supabase
+      .from('profiles')
+      .select('id, company, created_at')
+      .eq('parent_profile_id', userId)
+    // No podemos leer auth.users desde el cliente — usamos el email guardado en la invitación aceptada
+
+    // Invitaciones pendientes y aceptadas
+    const { data: invitations } = await supabase
+      .from('invitations')
+      .select('id, email, role, accepted_at, expires_at, created_at')
+      .eq('profile_id', userId)
+      .order('created_at', { ascending: false })
+
+    // Enriquecer miembros con el email de la invitación aceptada
+    const acceptedEmails = Object.fromEntries(
+      (invitations ?? [])
+        .filter(i => i.accepted_at)
+        .map(i => [i.email, i])
+    )
+
+    return {
+      members: (members ?? []).map(m => ({
+        id:       m.id,
+        company:  m.company,
+        joinedAt: m.created_at,
+        email:    Object.values(acceptedEmails).find(i => i)?.email ?? '',
+      })),
+      invitations: (invitations ?? []).filter(i => !i.accepted_at).map(i => ({
+        id:        i.id,
+        email:     i.email,
+        role:      i.role,
+        createdAt: i.created_at,
+        expiresAt: i.expires_at,
+      })),
+    }
+  },
+
+  async inviteTeamMember(email, role = 'member') {
+    const { userId, profileId } = await api._me()
+    if (userId !== profileId) throw new Error('Solo el propietario puede invitar miembros')
+
+    // Insertar invitación
+    const { data: inv, error } = await supabase
+      .from('invitations')
+      .insert({ profile_id: userId, email: email.toLowerCase().trim(), role })
+      .select('token, id')
+      .single()
+    check(error)
+
+    // Enviar email de invitación (falla silenciosa si no hay Resend)
+    const { data: profile } = await supabase.from('profiles').select('company').eq('id', userId).single()
+    await supabase.functions.invoke('send-invitation', {
+      body: {
+        email,
+        company:  profile?.company ?? 'Cobraya',
+        token:    inv.token,
+        role,
+      },
+    }).catch(() => {})
+
+    return { ok: true, invitationId: inv.id }
+  },
+
+  async revokeInvitation(invitationId) {
+    const { error } = await supabase.from('invitations').delete().eq('id', invitationId)
+    check(error)
+    return { ok: true }
+  },
+
+  async removeMember(memberId) {
+    const { error } = await supabase
+      .from('profiles')
+      .update({ parent_profile_id: null })
+      .eq('id', memberId)
+    check(error)
+    return { ok: true }
+  },
+
+  async getInvitationByToken(token) {
+    const { data, error } = await supabase
+      .from('invitations')
+      .select('id, email, role, expires_at, accepted_at, profiles(company)')
+      .eq('token', token)
+      .maybeSingle()
+    check(error)
+    if (!data) return null
+    return {
+      id:         data.id,
+      email:      data.email,
+      role:       data.role,
+      expiresAt:  data.expires_at,
+      acceptedAt: data.accepted_at,
+      company:    data.profiles?.company ?? 'Cobraya',
+    }
+  },
+
+  async acceptInvitation(token) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('Necesitás iniciar sesión primero')
+
+    // Obtener la invitación
+    const { data: inv } = await supabase
+      .from('invitations')
+      .select('id, profile_id, email, expires_at, accepted_at')
+      .eq('token', token)
+      .maybeSingle()
+
+    if (!inv) throw new Error('Invitación no encontrada o inválida')
+    if (inv.accepted_at) throw new Error('Esta invitación ya fue aceptada')
+    if (new Date(inv.expires_at) < new Date()) throw new Error('La invitación expiró')
+
+    // Setear parent_profile_id en el perfil del usuario actual
+    const { error: pe } = await supabase
+      .from('profiles')
+      .update({ parent_profile_id: inv.profile_id })
+      .eq('id', user.id)
+    check(pe)
+
+    // Marcar la invitación como aceptada
+    await supabase.from('invitations').update({ accepted_at: new Date().toISOString() }).eq('id', inv.id)
+
+    return { ok: true, profileId: inv.profile_id }
   },
 }

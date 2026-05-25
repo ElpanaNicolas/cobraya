@@ -10,6 +10,7 @@ import { NuevaFacturaModal } from '@/components/invoices/NuevaFacturaModal'
 import { Toaster } from '@/components/ui/Toast'
 import { Login }   from '@/pages/Login'
 import { Landing }  from '@/pages/Landing'
+import { AcceptarInvitacion } from '@/pages/AcceptarInvitacion'
 
 // Lazy-load pages — each gets its own chunk, slashing initial bundle size
 const Dashboard       = lazy(() => import('@/pages/Dashboard').then(m => ({ default: m.Dashboard })))
@@ -39,10 +40,11 @@ export default function App() {
   const [facturaModal, setFacturaModal] = useState(false)
   const [facturaKey, setFacturaKey] = useState(0)
 
-  // Página de pago pública — no requiere login
+  // Páginas públicas — no requieren login
   if (window.location.pathname.startsWith('/pagar/')) return (
     <Suspense fallback={<Spinner />}><PaginaPago /></Suspense>
   )
+  if (window.location.pathname === '/unirse') return <AcceptarInvitacion />
 
   if (authLoading) return <Spinner />
   if (!session) {

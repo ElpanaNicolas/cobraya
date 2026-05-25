@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { api } from '@/api'
 
 export function Login() {
   const [mode, setMode]       = useState('login') // 'login' | 'register'
@@ -25,8 +26,13 @@ export function Login() {
         email, password,
         options: { data: { company, whatsapp } },
       })
-      if (error) setError(error.message)
-      else setSuccess('Revisá tu email para confirmar la cuenta.')
+      if (error) {
+        setError(error.message)
+      } else {
+        setSuccess('Revisá tu email para confirmar la cuenta.')
+        // Email de bienvenida (falla silenciosa si no hay Resend configurado)
+        supabase.functions.invoke('send-welcome', { body: { email, company } }).catch(() => {})
+      }
     }
 
     setLoading(false)

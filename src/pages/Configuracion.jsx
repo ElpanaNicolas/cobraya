@@ -142,6 +142,180 @@ function TestReminderButton() {
   )
 }
 
+function EquipoSection({ user }) {
+  const { data: team, loading: teamLoading, refetch: refetchTeam } = useApi(useCallback(() => api.getTeam(), []))
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviting, setInviting]       = useState(false)
+
+  // Solo el propietario (userId === profileId) ve la sección completa
+  const isOwner = user?.id === user?.profileId // simplificado: si tiene parent_profile_id NO es owner
+
+  const handleInvite = async (e) => {
+    e.preventDefault()
+    if (!inviteEmail.trim()) return
+    setInviting(true)
+    try {
+      await api.inviteTeamMember(inviteEmail.trim())
+      toast.success(`Invitación enviada a ${inviteEmail}`)
+      setInviteEmail('')
+      refetchTeam()
+    } catch (err) {
+      toast.error(err.message || 'Error al enviar invitación')
+    } finally {
+      setInviting(false)
+    }
+  }
+
+  const handleRevoke = async (id) => {
+    try {
+      await api.revokeInvitation(id)
+      toast.success('Invitación revocada')
+      refetchTeam()
+    } catch {
+      toast.error('Error al revocar la invitación')
+    }
+  }
+
+  const handleRemove = async (memberId) => {
+    if (!confirm('¿Eliminar a este miembro del equipo?')) return
+    try {
+      await api.removeMember(memberId)
+      toast.success('Miembro eliminado')
+      refetchTeam()
+    } catch {
+      toast.error('Error al eliminar el miembro')
+    }
+  }
+
+  const chipStyle = (color) => ({
+    fontSize: 9, fontWeight: 700, borderRadius: 4, padding: '2px 7px',
+    background: `${color}18`, color, border: `1px solid ${color}38`,
+    letterSpacing: '.04em', textTransform: 'uppercase',
+    fontFamily: 'var(--font-ui)',
+  })
+
+  const inputStyle = {
+    flex: 1, background: 'var(--surface2)', border: '1px solid var(--border2)',
+    borderRadius: 6, padding: '8px 12px', color: 'var(--white)',
+    fontSize: 12, fontFamily: 'var(--font-mono)', outline: 'none',
+  }
+
+  return (
+    <Section title="Equipo" subtitle="Invitá a colegas para que accedan a la misma cuenta">
+      {teamLoading ? (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          <Skeleton h={40} /><Skeleton h={40} />
+        </div>
+      ) : (
+        <>
+          {/* Miembros activos */}
+          {team?.members?.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--font-ui)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 10 }}>
+                Miembros activos
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {team.members.map(m => (
+                  <div key={m.id} style={{
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    padding: '10px 14px',
+                    background: 'var(--surface2)', border: '1px solid var(--border2)',
+                    borderRadius: 8,
+                  }}>
+                    <div style={{
+                      width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
+                      background: 'rgba(45,158,95,0.15)', border: '1px solid rgba(45,158,95,0.3)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      fontSize: 13, fontWeight: 700, color: 'var(--green-l)',
+                    }}>
+                      {(m.email || m.company || '?').slice(0,1).toUpperCase()}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-ui)', color: 'var(--white)' }} className="truncate">
+                        {m.email || m.company || 'Miembro'}
+                      </div>
+                      <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 1 }}>
+                        Se unió {new Date(m.joinedAt).toLocaleDateString('es-UY', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </div>
+                    </div>
+                    <span style={chipStyle('var(--green-l)')}>Activo</span>
+                    <button onClick={() => handleRemove(m.id)} title="Eliminar miembro"
+                      style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: 14, padding: '2px 4px' }}>
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Invitaciones pendientes */}
+          {team?.invitations?.length > 0 && (
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 10, color: 'var(--muted)', fontFamily: 'var(--font-ui)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 10 }}>
+                Invitaciones pendientes
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {team.invitations.map(inv => (
+                  <div key={inv.id} style={{
+                    display: 'flex', alignItems: 'center', gap: 12,
+                    padding: '10px 14px',
+                    background: 'var(--surface2)', border: '1px solid var(--border2)',
+                    borderRadius: 8,
+                  }}>
+                    <div style={{
+                      width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
+                      background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.25)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 14,
+                    }}>✉️</div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, fontFamily: 'var(--font-ui)', color: 'var(--white)' }} className="truncate">
+                        {inv.email}
+                      </div>
+                      <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 1 }}>
+                        Vence {new Date(inv.expiresAt).toLocaleDateString('es-UY', { day: 'numeric', month: 'short' })}
+                      </div>
+                    </div>
+                    <span style={chipStyle('#fbbf24')}>Pendiente</span>
+                    <button onClick={() => handleRevoke(inv.id)} title="Revocar invitación"
+                      style={{ background: 'none', border: 'none', color: 'var(--muted)', cursor: 'pointer', fontSize: 14, padding: '2px 4px' }}>
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Form para invitar */}
+          <form onSubmit={handleInvite} style={{ display: 'flex', gap: 8 }}>
+            <input
+              type="email"
+              value={inviteEmail}
+              onChange={e => setInviteEmail(e.target.value)}
+              placeholder="email@empresa.com"
+              style={inputStyle}
+              required
+            />
+            <button type="submit" disabled={inviting || !inviteEmail.trim()} style={{
+              padding: '8px 18px', borderRadius: 6, border: 'none', flexShrink: 0,
+              background: inviteEmail.trim() ? 'var(--green)' : 'var(--surface3)',
+              color: 'var(--white)', fontFamily: 'var(--font-ui)', fontWeight: 700,
+              fontSize: 12, cursor: inviteEmail.trim() ? 'pointer' : 'default',
+              opacity: inviting ? 0.7 : 1,
+            }}>
+              {inviting ? 'Enviando…' : '+ Invitar'}
+            </button>
+          </form>
+          <div style={{ fontSize: 10, color: 'var(--muted2)', marginTop: 6 }}>
+            El invitado recibirá un email con un link para unirse a tu cuenta.
+          </div>
+        </>
+      )}
+    </Section>
+  )
+}
+
 export function Configuracion() {
   const { data: cfg, loading } = useApi(useCallback(() => api.getAgentConfig(), []))
   const { data: user }         = useApi(useCallback(() => api.getUser(), []))
@@ -549,6 +723,9 @@ export function Configuracion() {
           </Field>
         </div>
       </Section>
+
+      {/* Equipo */}
+      <EquipoSection user={user} />
     </div>
   )
 }
