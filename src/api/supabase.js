@@ -52,6 +52,7 @@ export const api = {
       twilioWaNumber:       data.twilio_wa_number      ?? '',
       paymentInstructions:  data.payment_instructions  ?? '',
       mpAccessToken:        data.mp_access_token       ?? '',
+      mpPublicKey:          data.mp_public_key         ?? '',
       bankName:             data.bank_name             ?? '',
       bankAccount:          data.bank_account          ?? '',
       bankAlias:            data.bank_alias            ?? '',
@@ -581,7 +582,7 @@ export const api = {
   },
 
   async saveProfile({ company, signature, twilioAccountSid, twilioAuthToken, twilioWaNumber,
-                      paymentInstructions, mpAccessToken,
+                      paymentInstructions, mpAccessToken, mpPublicKey,
                       bankName, bankAccount, bankAlias,
                       stripePk, stripeSk,
                       waProvider, metaPhoneNumberId, metaAccessToken, metaWabaId, metaVerifyToken }) {
@@ -598,6 +599,7 @@ export const api = {
                                                    whatsapp:              t(twilioWaNumber)     }),
         ...(paymentInstructions !== undefined && { payment_instructions:  t(paymentInstructions) }),
         ...(mpAccessToken       !== undefined && { mp_access_token:       t(mpAccessToken)      }),
+        ...(mpPublicKey         !== undefined && { mp_public_key:         t(mpPublicKey)        }),
         ...(bankName            !== undefined && { bank_name:             t(bankName)            }),
         ...(bankAccount         !== undefined && { bank_account:          t(bankAccount)         }),
         ...(bankAlias           !== undefined && { bank_alias:            t(bankAlias)           }),

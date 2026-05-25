@@ -35,7 +35,7 @@ serve(async (req) => {
   // Datos del negocio — solo campos públicos, nunca secrets
   const { data: profile } = await supabase
     .from('profiles')
-    .select('company, payment_instructions, mp_access_token, bank_name, bank_account, bank_alias, stripe_pk')
+    .select('company, payment_instructions, mp_access_token, mp_public_key, bank_name, bank_account, bank_alias, stripe_pk')
     .eq('id', invoice.profile_id)
     .single()
 
@@ -49,6 +49,7 @@ serve(async (req) => {
     company:             profile?.company ?? '',
     // Métodos de pago disponibles
     hasMercadoPago:      !!(profile?.mp_access_token?.trim()),
+    mpPublicKey:         profile?.mp_public_key?.trim() ?? '',        // seguro exponer al frontend
     hasStripe:           !!(profile?.stripe_pk?.trim()),
     stripePk:            profile?.stripe_pk?.trim() ?? '',       // public key, seguro exponer
     hasBankTransfer:     !!(profile?.bank_account?.trim()),

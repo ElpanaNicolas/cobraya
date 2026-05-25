@@ -335,6 +335,7 @@ export function Configuracion() {
     twilioWaNumber:      user.twilioWaNumber      ?? '',
     paymentInstructions: user.paymentInstructions ?? '',
     mpAccessToken:       user.mpAccessToken       ?? '',
+    mpPublicKey:         user.mpPublicKey         ?? '',
     bankName:            user.bankName            ?? '',
     bankAccount:         user.bankAccount         ?? '',
     bankAlias:           user.bankAlias           ?? '',
@@ -641,14 +642,37 @@ export function Configuracion() {
             />
           </div>
           {(!!profile?.mpAccessToken || profile?.mpAccessToken === '') && (
-            <Field label="Access Token de MercadoPago" hint={<>Conseguilo en <a href="https://www.mercadopago.com.uy/developers/es/docs/getting-started" target="_blank" rel="noreferrer" style={{ color: 'var(--green-l)' }}>mercadopago.com.uy → Credenciales</a></>}>
-              <Input
-                value={profile?.mpAccessToken ?? ''}
-                onChange={e => setProfile(p => ({ ...p, mpAccessToken: e.target.value }))}
-                placeholder="APP_USR-xxxxxxxxxxxxxxxxxxxx"
-                type="password"
-              />
-            </Field>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+              {/* Tip: dónde encontrar las credenciales */}
+              <div style={{ padding: '10px 14px', borderRadius: 8, background: 'rgba(0,158,227,0.06)', border: '1px solid rgba(0,158,227,0.18)', marginBottom: 14, fontSize: 11, color: 'var(--muted)', lineHeight: 1.6 }}>
+                📍 Encontrás ambas claves en{' '}
+                <a href="https://www.mercadopago.com.uy/developers/panel/app" target="_blank" rel="noreferrer" style={{ color: '#009ee3' }}>
+                  mercadopago.com.uy → Tus integraciones → Credenciales de producción
+                </a>
+              </div>
+              <div className="config-grid-2" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <Field label="Clave pública" hint="Empieza con APP_USR- · segura para el frontend">
+                  <Input
+                    value={profile?.mpPublicKey ?? ''}
+                    onChange={e => setProfile(p => ({ ...p, mpPublicKey: e.target.value }))}
+                    placeholder="APP_USR-xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+                  />
+                </Field>
+                <Field label="Access Token" hint="Empieza con APP_USR- · se guarda de forma segura">
+                  <Input
+                    value={profile?.mpAccessToken ?? ''}
+                    onChange={e => setProfile(p => ({ ...p, mpAccessToken: e.target.value }))}
+                    placeholder="APP_USR-xxxxxxxxxxxxxxxxxxxx"
+                    type="password"
+                  />
+                </Field>
+              </div>
+              {profile?.mpPublicKey && (
+                <div style={{ marginTop: 8, padding: '8px 12px', borderRadius: 6, background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.2)', fontSize: 11, color: 'var(--green-l)' }}>
+                  ✓ Con la clave pública configurada, tus clientes verán el botón de MercadoPago con Face ID / huella directamente en la página de pago — sin salir a otro sitio.
+                </div>
+              )}
+            </div>
           )}
         </div>
 

@@ -26,7 +26,7 @@ function fmt(n) {
 const DEMO_INFO = {
   company: 'Ferretería San José', clientName: 'Supermercado El Sol',
   cfeId: 'A 0001-000247', amount: 18500, due: '2025-06-30', status: 'pending',
-  hasMercadoPago: true, hasStripe: false, hasBankTransfer: true,
+  hasMercadoPago: true, mpPublicKey: '', hasStripe: false, hasBankTransfer: true,
   bankName: 'BROU', bankAccount: '001-0123456/00', bankAlias: 'ferreteriasjose.uy',
   paymentInstructions: 'Titular: Ferretería San José S.R.L.\nSISTARBANC: indicar número de factura en la referencia.',
   stripePk: null,
@@ -65,23 +65,28 @@ export function PaginaPago() {
       .catch(() => setLoading(false))
   }, [invoiceId, isDemo])
 
-  // ── Pre-cargar preferencia de MP cuando sabemos que hay MP disponible ──────
+  // ── Cargar SDK de MercadoPago cuando hay clave pública ────────────────────
   useEffect(() => {
-    if (!info?.hasMercadoPago || isDemo || mpPreloaded.current || info?.status === 'paid') return
-    mpPreloaded.current = true
+    if (!info?.mpPublicKey || info?.status === 'paid') return
+    if (window.MercadoPago) { setMpReady(true); return }
+    const script = document.createElement('script')
+    script.src = 'https://sdk.mercadopago.com/js/v2'
+    script.onload = () => setMpReady(true)
+    script.onerror = () => {}
+    document.head.appendChild(script)
+  }, [info?.mpPublicKey, info?.status])
 
+  // ── Pre-cargar preferencia de MP (fallback sin clave pública) ─────────────
+  useEffect(() => {
+    if (!info?.hasMercadoPago || info?.mpPublicKey || isDemo || mpPreloaded.current || info?.status === 'paid') return
+    mpPreloaded.current = true
     callFn('create-mp-preference', {
-      method: 'POST',
-      body: JSON.stringify({ invoiceId }),
+      method: 'POST', body: JSON.stringify({ invoiceId }),
     }).then(data => {
       if (data.initPoint || data.sandboxUrl) {
         setMpUrl(data.initPoint ?? data.sandboxUrl)
-        setMpReady(true)
       }
-    }).catch(() => {
-      // Si falla el pre-load, lo intentamos al hacer click
-      setMpReady(false)
-    })
+    }).catch(() => {})
   }, [info, invoiceId, isDemo])
 
   // ── Volver de MercadoPago ──────────────────────────────────────────────────
@@ -109,17 +114,10 @@ export function PaginaPago() {
     }
   }, [params, invoiceId, isDemo])
 
-  // ── Pagar con MP ──────────────────────────────────────────────────────────
-  async function handleMercadoPago() {
+  // ── Pagar con MP (fallback redirect — cuando no hay clave pública) ─────────
+  async function handleMercadoPagoRedirect() {
     if (isDemo) { setScreen('success'); setMsg('Demo: en producción redirige a MercadoPago.'); return }
-
-    // Si ya está pre-cargado, redirect instantáneo
-    if (mpReady && mpUrl) {
-      window.location.href = mpUrl
-      return
-    }
-
-    // Fallback: crear preferencia ahora
+    if (mpUrl) { window.location.href = mpUrl; return }
     setMpLoading(true)
     try {
       const data = await callFn('create-mp-preference', {
@@ -241,7 +239,8 @@ export function PaginaPago() {
   const isPaid       = info.status === 'paid'
   const hasMp        = info.hasMercadoPago
   const hasBank      = info.hasBankTransfer
-  const hasDLocal    = !!DLOCAL_API_KEY  // Apple Pay / Google Pay
+  const hasDLocal    = !!DLOCAL_API_KEY
+  const hasMpBricks  = hasMp && !!info.mpPublicKey && mpReady  // Wallet Button con Face ID
 
   return (
     <Page>
@@ -289,38 +288,42 @@ export function PaginaPago() {
             />
           )}
 
-          {/* MercadoPago — botón principal */}
+          {/* MercadoPago Wallet Button (con Face ID / huella) */}
           {hasMp && (
-            <button
-              onClick={handleMercadoPago}
-              disabled={mpLoading}
-              style={{
-                ...t.btnBig,
-                background: mpLoading ? '#007bb5' : '#009ee3',
-                opacity: mpLoading ? 0.85 : 1,
-                boxShadow: '0 4px 24px rgba(0,158,227,0.25)',
-              }}
-            >
-              {mpLoading ? (
-                <>
-                  <SmallSpinner />
-                  Conectando…
-                </>
-              ) : (
-                <>
-                  <span style={{ fontSize: 20 }}>💳</span>
-                  <div style={{ flex: 1, textAlign: 'left' }}>
-                    <div style={{ fontWeight: 800, fontSize: 15, lineHeight: 1 }}>
-                      Pagar ${fmt(info.amount)} UYU
-                    </div>
-                    <div style={{ fontSize: 11, opacity: 0.8, marginTop: 3 }}>
-                      MercadoPago · tarjeta · cuotas · saldo MP
-                    </div>
-                  </div>
-                  <span style={{ fontSize: 20, opacity: 0.7 }}>›</span>
-                </>
-              )}
-            </button>
+            hasMpBricks
+              ? <MpWalletBrick
+                  invoiceId={invoiceId}
+                  publicKey={info.mpPublicKey}
+                  isDemo={isDemo}
+                  onError={m => { setScreen('error'); setMsg(m) }}
+                />
+              : <button
+                  onClick={handleMercadoPagoRedirect}
+                  disabled={mpLoading}
+                  style={{
+                    ...t.btnBig,
+                    background: mpLoading ? '#007bb5' : '#009ee3',
+                    opacity: mpLoading ? 0.85 : 1,
+                    boxShadow: '0 4px 24px rgba(0,158,227,0.25)',
+                  }}
+                >
+                  {mpLoading ? (
+                    <><SmallSpinner />Conectando…</>
+                  ) : (
+                    <>
+                      <span style={{ fontSize: 20 }}>💳</span>
+                      <div style={{ flex: 1, textAlign: 'left' }}>
+                        <div style={{ fontWeight: 800, fontSize: 15, lineHeight: 1 }}>
+                          Pagar ${fmt(info.amount)} UYU
+                        </div>
+                        <div style={{ fontSize: 11, opacity: 0.8, marginTop: 3 }}>
+                          MercadoPago · tarjeta · cuotas · saldo MP
+                        </div>
+                      </div>
+                      <span style={{ fontSize: 20, opacity: 0.7 }}>›</span>
+                    </>
+                  )}
+                </button>
           )}
 
           {/* Transferencia bancaria — opción secundaria */}
@@ -356,6 +359,95 @@ export function PaginaPago() {
         </div>
       )}
     </Page>
+  )
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MercadoPago Wallet Button (Bricks)
+// Muestra el botón oficial de MP embebido en la página.
+// En mobile con app MP instalada → Face ID / huella directo.
+// Requiere: clave pública del negocio en mp_public_key.
+// ══════════════════════════════════════════════════════════════════════════════
+function MpWalletBrick({ invoiceId, publicKey, isDemo, onError }) {
+  const containerRef = useRef()
+  const brickRef     = useRef(null)
+  const [ready, setReady] = useState(false)
+
+  useEffect(() => {
+    if (!containerRef.current || brickRef.current) return
+
+    try {
+      const mp = new window.MercadoPago(publicKey, { locale: 'es-UY' })
+      mp.bricks().create('wallet', containerRef.current, {
+        initialization: {
+          // Sin preferenceId — se crea en onSubmit para máxima frescura
+        },
+        customization: {
+          texts: {
+            action:    'pay',          // "Pagar"
+            valueProp: 'smart_option', // "de forma rápida y segura"
+          },
+          visual: {
+            buttonBackground: 'default', // azul MP
+            borderRadius:     '14px',
+            buttonHeight:     '56px',
+          },
+        },
+        callbacks: {
+          onReady: () => setReady(true),
+
+          // MP llama onSubmit cuando el usuario hace click en el botón
+          // Debemos devolver una Promise que resuelva con { preferenceId }
+          onSubmit: () => {
+            if (isDemo) {
+              return Promise.resolve({ preferenceId: 'demo' })
+            }
+            return callFn('create-mp-preference', {
+              method: 'POST',
+              body: JSON.stringify({ invoiceId }),
+            }).then(data => {
+              if (data.error) throw new Error(data.error)
+              return { preferenceId: data.preferenceId }
+            })
+          },
+
+          onError: (err) => {
+            console.error('MP Brick error:', err)
+            onError('Error al iniciar el pago. Intentá de nuevo.')
+          },
+        },
+      }).then(brick => { brickRef.current = brick })
+
+    } catch (e) {
+      console.warn('MP Bricks init error:', e)
+    }
+
+    return () => {
+      brickRef.current?.unmount?.()
+      brickRef.current = null
+    }
+  }, [publicKey, invoiceId, isDemo])
+
+  return (
+    <div style={{ width: '100%' }}>
+      {/* Contenedor donde MP monta el botón */}
+      <div ref={containerRef} style={{ width: '100%', minHeight: 56 }} />
+
+      {/* Skeleton mientras carga el brick */}
+      {!ready && (
+        <div style={{
+          width: '100%', height: 56, borderRadius: 14, marginTop: -56,
+          background: 'linear-gradient(90deg, #009ee3 0%, #007bb5 100%)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+          pointerEvents: 'none',
+        }}>
+          <SmallSpinner />
+          <span style={{ color: 'rgba(255,255,255,0.8)', fontSize: 14, fontWeight: 600 }}>
+            MercadoPago…
+          </span>
+        </div>
+      )}
+    </div>
   )
 }
 
