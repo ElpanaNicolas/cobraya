@@ -15,7 +15,8 @@ create table if not exists invitations (
   profile_id   uuid references profiles(id) on delete cascade not null,
   email        text not null,
   role         text not null default 'member',
-  token        text unique not null default encode(gen_random_bytes(32), 'hex'),
+  -- Token: dos UUIDs concatenados sin guiones = 64 hex chars, 256 bits de entropía
+  token        text unique not null default replace(gen_random_uuid()::text, '-', '') || replace(gen_random_uuid()::text, '-', ''),
   accepted_at  timestamptz,
   expires_at   timestamptz not null default now() + interval '7 days',
   created_at   timestamptz not null default now()
