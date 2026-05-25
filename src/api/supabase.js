@@ -3,6 +3,7 @@
 // Reemplaza a src/api/mock.js una vez que configures .env.local
 // ─────────────────────────────────────────────────────────────
 import { supabase } from '@/lib/supabase'
+import { getLimits } from '@/lib/plans'
 
 // Helper: lanza si hay error de Supabase
 function check(error) {
@@ -61,7 +62,10 @@ export const api = {
       metaAccessToken:      data.meta_access_token     ?? '',
       metaWabaId:           data.meta_waba_id          ?? '',
       metaVerifyToken:      data.meta_verify_token     ?? '',
-      onboardingCompleted:  data.onboarding_completed  ?? true,  // true = ya configurado (default seguro pre-migración)
+      onboardingCompleted:  data.onboarding_completed  ?? true,
+      planStartsAt:         data.plan_starts_at        ?? null,
+      planExpiresAt:        data.plan_expires_at       ?? null,
+      mpPreapprovalId:      data.mp_preapproval_id     ?? null,
     }
   },
 
@@ -391,6 +395,19 @@ export const api = {
 
   async createClient({ name, rut, phone, email }) {
     const { profileId } = await api._me()
+
+    // Verificar límite del plan
+    const { data: profile } = await supabase.from('profiles').select('plan').eq('id', profileId).single()
+    const limits = getLimits(profile?.plan ?? 'free')
+    if (limits.maxClients !== Infinity) {
+      const { count } = await supabase.from('clients').select('id', { count: 'exact', head: true }).eq('profile_id', profileId)
+      if ((count ?? 0) >= limits.maxClients) {
+        const err = new Error(`Límite del plan: máximo ${limits.maxClients} clientes en el plan gratuito.`)
+        err.code = 'PLAN_LIMIT'
+        throw err
+      }
+    }
+
     const { data, error } = await supabase
       .from('clients')
       .insert({ profile_id: profileId, name, rut, phone, email })
@@ -402,6 +419,19 @@ export const api = {
 
   async createInvoice({ clientId, cfeId, amount, issued, due, channel }) {
     const { profileId } = await api._me()
+
+    // Verificar límite del plan
+    const { data: profile } = await supabase.from('profiles').select('plan').eq('id', profileId).single()
+    const limits = getLimits(profile?.plan ?? 'free')
+    if (limits.maxInvoices !== Infinity) {
+      const { count } = await supabase.from('invoices').select('id', { count: 'exact', head: true }).eq('profile_id', profileId)
+      if ((count ?? 0) >= limits.maxInvoices) {
+        const err = new Error(`Límite del plan: máximo ${limits.maxInvoices} facturas en el plan gratuito.`)
+        err.code = 'PLAN_LIMIT'
+        throw err
+      }
+    }
+
     const { data, error } = await supabase
       .from('invoices')
       .insert({

@@ -4,6 +4,7 @@ import { useApi } from '@/hooks/useApi'
 import { Modal } from '@/components/ui/Modal'
 import { Button } from '@/components/ui/Button'
 import { NuevoClienteModal } from '@/components/clientes/NuevoClienteModal'
+import { UpgradeBanner } from '@/components/ui/UpgradeBanner'
 import { toast } from '@/components/ui/Toast'
 
 function Field({ label, required, children }) {
@@ -54,8 +55,9 @@ export function NuevaFacturaModal({ onClose, onCreated }) {
     due:      addDays(30),
     channel:  'whatsapp',
   })
-  const [loading, setLoading] = useState(false)
-  const [error, setError]     = useState(null)
+  const [loading, setLoading]   = useState(false)
+  const [error, setError]       = useState(null)
+  const [planLimit, setPlanLimit] = useState(false)
   const [showNewClient, setShowNewClient] = useState(false)
 
   // Auto-generar CFE ID cuando llegan las facturas
@@ -83,7 +85,11 @@ export function NuevaFacturaModal({ onClose, onCreated }) {
       onCreated(inv)
       onClose()
     } catch (err) {
-      setError(err.message)
+      if (err.code === 'PLAN_LIMIT') {
+        setPlanLimit(true)
+      } else {
+        setError(err.message)
+      }
     } finally {
       setLoading(false)
     }
@@ -160,6 +166,9 @@ export function NuevaFacturaModal({ onClose, onCreated }) {
               </div>
             </Field>
 
+            {planLimit && (
+              <UpgradeBanner plan="free" invoices={50} compact />
+            )}
             {error && (
               <div style={{
                 padding: '9px 12px', background: 'rgba(224,96,96,0.1)',

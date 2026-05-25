@@ -1,10 +1,11 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useCallback } from 'react'
 import { api } from '@/api'
 import { useApi } from '@/hooks/useApi'
 import { KPICards }     from '@/components/dashboard/KPICards'
 import { TrendChart }   from '@/components/dashboard/TrendChart'
 import { ActivityFeed } from '@/components/dashboard/ActivityFeed'
 import { InvoiceTable } from '@/components/invoices/InvoiceTable'
+import { UpgradeBanner } from '@/components/ui/UpgradeBanner'
 import { toast } from '@/components/ui/Toast'
 
 // @react-pdf/renderer es ~1.4 MB — cargarlo sólo cuando el usuario lo pide
@@ -17,6 +18,7 @@ export function Dashboard() {
   const invoices  = useApi(api.getInvoices)
   const activity  = useApi(api.getActivity)
   const chart     = useApi(api.getChartData)
+  const userApi   = useApi(useCallback(() => api.getUser(), []))
 
   const handleAction = async (action, invoiceId) => {
     try {
@@ -53,6 +55,15 @@ export function Dashboard() {
           <MonthlyReportButton />
         </Suspense>
       </div>
+
+      {/* Upgrade banner — solo si está cerca del límite */}
+      {userApi.data && (
+        <UpgradeBanner
+          plan={userApi.data.plan ?? 'free'}
+          clients={0}
+          invoices={invoices.data?.length ?? 0}
+        />
+      )}
 
       {/* KPIs */}
       <KPICards data={kpis.data} loading={kpis.loading} />
