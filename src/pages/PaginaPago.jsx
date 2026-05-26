@@ -369,67 +369,57 @@ export function PaginaPago() {
 // Requiere: clave pública del negocio en mp_public_key.
 // ══════════════════════════════════════════════════════════════════════════════
 function MpWalletBrick({ invoiceId, publicKey, isDemo, onError }) {
-  const containerId = `mp-wallet-${invoiceId}`
-  const brickRef    = useRef(null)
-  const [ready, setReady] = useState(false)
+  const containerId        = `mp-wallet-${invoiceId}`
+  const brickRef           = useRef(null)
+  const [ready, setReady]  = useState(false)
+  const [prefId, setPrefId] = useState(null)
 
+  // Paso 1: crear preferencia primero (antes de inicializar el Brick)
   useEffect(() => {
-    if (brickRef.current) return
+    if (isDemo) { setPrefId('demo'); return }
+    callFn('create-mp-preference', {
+      method: 'POST',
+      body:   JSON.stringify({ invoiceId }),
+    }).then(data => {
+      if (data.error) { onError(data.error); return }
+      setPrefId(data.preferenceId)
+    }).catch(() => onError('No se pudo conectar con MercadoPago.'))
+  }, [invoiceId, isDemo])
+
+  // Paso 2: inicializar el Brick solo cuando ya tenemos preferenceId
+  useEffect(() => {
+    if (!prefId || brickRef.current) return
 
     try {
       const mp = new window.MercadoPago(publicKey, { locale: 'es-UY' })
       mp.bricks().create('wallet', containerId, {
         initialization: {
-          redirectMode: 'modal',   // abre checkout en modal, sin abandonar la página
+          preferenceId: prefId,
+          redirectMode: 'self',   // redirige en el mismo tab; abre app MP con Face ID
         },
         customization: {
-          texts: {
-            action:    'pay',
-            valueProp: 'smart_option',
-          },
-          visual: {
-            buttonBackground: 'default',
-            borderRadius:     '14px',
-            buttonHeight:     '56px',
-          },
+          texts:  { action: 'pay', valueProp: 'smart_option' },
+          visual: { buttonBackground: 'default', borderRadius: '14px', buttonHeight: '56px' },
         },
         callbacks: {
           onReady: () => setReady(true),
-
-          onSubmit: () => {
-            if (isDemo) return Promise.resolve({ preferenceId: 'demo' })
-            return callFn('create-mp-preference', {
-              method: 'POST',
-              body: JSON.stringify({ invoiceId }),
-            }).then(data => {
-              if (data.error) throw new Error(data.error)
-              return { preferenceId: data.preferenceId }
-            })
-          },
-
           onError: (err) => {
             console.error('MP Brick error:', err)
             onError('Error al iniciar el pago. Intentá de nuevo.')
           },
         },
       }).then(brick => { brickRef.current = brick })
-
     } catch (e) {
       console.warn('MP Bricks init error:', e)
+      onError('Error al cargar MercadoPago.')
     }
 
-    return () => {
-      brickRef.current?.unmount?.()
-      brickRef.current = null
-    }
-  }, [publicKey, invoiceId, isDemo, containerId])
+    return () => { brickRef.current?.unmount?.(); brickRef.current = null }
+  }, [prefId, publicKey, containerId])
 
   return (
     <div style={{ width: '100%' }}>
-      {/* Contenedor donde MP monta el botón — ID en lugar de ref */}
       <div id={containerId} style={{ width: '100%', minHeight: 56 }} />
-
-      {/* Skeleton mientras carga el brick */}
       {!ready && (
         <div style={{
           width: '100%', height: 56, borderRadius: 14, marginTop: -56,
