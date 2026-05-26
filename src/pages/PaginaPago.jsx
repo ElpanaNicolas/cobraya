@@ -12,7 +12,7 @@ const DLOCAL_API_KEY    = import.meta.env.VITE_DLOCAL_API_KEY ?? ''
 
 async function callFn(name, opts = {}) {
   const res = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
-    headers: { apikey: SUPABASE_ANON_KEY, 'Content-Type': 'application/json' },
+    headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}`, 'Content-Type': 'application/json' },
     ...opts,
   })
   return res.json()
@@ -58,7 +58,7 @@ export function PaginaPago() {
   useEffect(() => {
     if (isDemo) return
     fetch(`${SUPABASE_URL}/functions/v1/get-payment-info?id=${invoiceId}`, {
-      headers: { apikey: SUPABASE_ANON_KEY },
+      headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` },
     })
       .then(r => r.json())
       .then(d => { setInfo(d); setLoading(false) })
