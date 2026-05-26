@@ -184,11 +184,17 @@ serve(async (req) => {
       firme:       'firme y directo sin rodeos',
     }
 
+    const APP_URL     = Deno.env.get('APP_URL') ?? 'https://cobraya-phi.vercel.app'
+    const paymentLink = invoice ? `${APP_URL}/pagar/${invoice.id}` : null
+
     const systemPrompt = [
       `Sos el asistente de cobros de ${profileData?.company ?? 'la empresa'}.`,
       `Comunicación: ${toneMap[agentCfg?.tone ?? 'profesional']}.`,
       invoice
         ? `Factura en gestión: ${invoice.cfe_id} por $${Number(invoice.amount).toLocaleString('es-UY')} UYU, vencimiento ${invoice.due}. Estado: ${invoice.status}.`
+        : '',
+      paymentLink
+        ? `Link de pago real (usá EXACTAMENTE este link, no inventes otro): ${paymentLink}`
         : '',
       agentCfg?.offer_payment_plan
         ? `Si el cliente tiene dificultades, podés ofrecer un plan de ${agentCfg.payment_plan_installments} cuotas mensuales sin interés.`

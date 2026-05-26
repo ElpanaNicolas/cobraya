@@ -146,7 +146,7 @@ export function PaginaPago() {
       fd.append('invoiceId', invoiceId)
       fd.append('file', file)
       const res = await fetch(`${SUPABASE_URL}/functions/v1/upload-receipt`, {
-        method: 'POST', headers: { apikey: SUPABASE_ANON_KEY }, body: fd,
+        method: 'POST', headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` }, body: fd,
       })
       const data = await res.json()
       if (data.ok) {
