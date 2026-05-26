@@ -51,7 +51,7 @@ serve(async (req) => {
     const firma = profile?.signature || profile?.company || 'El equipo de cobros'
 
     // ── Link de pago personalizado ───────────────────────────
-    const APP_URL    = Deno.env.get('APP_URL') ?? 'https://cobraya-7354.vercel.app'
+    const APP_URL    = Deno.env.get('APP_URL') ?? 'https://cobraya-phi.vercel.app'
     const paymentLink = `${APP_URL}/pagar/${invoiceId}`
 
     // ── Prompt según tipo de acción ──────────────────────────

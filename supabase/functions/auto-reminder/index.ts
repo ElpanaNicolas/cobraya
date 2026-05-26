@@ -16,7 +16,7 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 )
 
-const APP_URL = Deno.env.get('APP_URL') ?? 'https://cobraya-7354.vercel.app'
+const APP_URL = Deno.env.get('APP_URL') ?? 'https://cobraya-phi.vercel.app'
 
 function uruguayHour(): number {
   return (new Date().getUTCHours() - 3 + 24) % 24
