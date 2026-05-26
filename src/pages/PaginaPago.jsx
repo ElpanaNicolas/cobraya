@@ -369,26 +369,26 @@ export function PaginaPago() {
 // Requiere: clave pública del negocio en mp_public_key.
 // ══════════════════════════════════════════════════════════════════════════════
 function MpWalletBrick({ invoiceId, publicKey, isDemo, onError }) {
-  const containerRef = useRef()
-  const brickRef     = useRef(null)
+  const containerId = `mp-wallet-${invoiceId}`
+  const brickRef    = useRef(null)
   const [ready, setReady] = useState(false)
 
   useEffect(() => {
-    if (!containerRef.current || brickRef.current) return
+    if (brickRef.current) return
 
     try {
       const mp = new window.MercadoPago(publicKey, { locale: 'es-UY' })
-      mp.bricks().create('wallet', containerRef.current, {
+      mp.bricks().create('wallet', containerId, {
         initialization: {
-          // Sin preferenceId — se crea en onSubmit para máxima frescura
+          redirectMode: 'modal',   // abre checkout en modal, sin abandonar la página
         },
         customization: {
           texts: {
-            action:    'pay',          // "Pagar"
-            valueProp: 'smart_option', // "de forma rápida y segura"
+            action:    'pay',
+            valueProp: 'smart_option',
           },
           visual: {
-            buttonBackground: 'default', // azul MP
+            buttonBackground: 'default',
             borderRadius:     '14px',
             buttonHeight:     '56px',
           },
@@ -396,12 +396,8 @@ function MpWalletBrick({ invoiceId, publicKey, isDemo, onError }) {
         callbacks: {
           onReady: () => setReady(true),
 
-          // MP llama onSubmit cuando el usuario hace click en el botón
-          // Debemos devolver una Promise que resuelva con { preferenceId }
           onSubmit: () => {
-            if (isDemo) {
-              return Promise.resolve({ preferenceId: 'demo' })
-            }
+            if (isDemo) return Promise.resolve({ preferenceId: 'demo' })
             return callFn('create-mp-preference', {
               method: 'POST',
               body: JSON.stringify({ invoiceId }),
@@ -426,12 +422,12 @@ function MpWalletBrick({ invoiceId, publicKey, isDemo, onError }) {
       brickRef.current?.unmount?.()
       brickRef.current = null
     }
-  }, [publicKey, invoiceId, isDemo])
+  }, [publicKey, invoiceId, isDemo, containerId])
 
   return (
     <div style={{ width: '100%' }}>
-      {/* Contenedor donde MP monta el botón */}
-      <div ref={containerRef} style={{ width: '100%', minHeight: 56 }} />
+      {/* Contenedor donde MP monta el botón — ID en lugar de ref */}
+      <div id={containerId} style={{ width: '100%', minHeight: 56 }} />
 
       {/* Skeleton mientras carga el brick */}
       {!ready && (
