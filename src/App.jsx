@@ -20,6 +20,8 @@ const AgenteIA        = lazy(() => import('@/pages/AgenteIA').then(m => ({ defau
 const Configuracion   = lazy(() => import('@/pages/Configuracion').then(m => ({ default: m.Configuracion })))
 const PaginaPago      = lazy(() => import('@/pages/PaginaPago').then(m => ({ default: m.PaginaPago })))
 const OnboardingWizard = lazy(() => import('@/components/onboarding/OnboardingWizard').then(m => ({ default: m.OnboardingWizard })))
+const Privacidad      = lazy(() => import('@/pages/Legal').then(m => ({ default: m.Privacidad })))
+const Terminos        = lazy(() => import('@/pages/Legal').then(m => ({ default: m.Terminos })))
 
 function Spinner() {
   return (
@@ -45,6 +47,12 @@ export default function App() {
     <Suspense fallback={<Spinner />}><PaginaPago /></Suspense>
   )
   if (window.location.pathname === '/unirse') return <AcceptarInvitacion />
+  if (window.location.pathname === '/privacidad') return (
+    <Suspense fallback={<Spinner />}><Privacidad /></Suspense>
+  )
+  if (window.location.pathname === '/terminos') return (
+    <Suspense fallback={<Spinner />}><Terminos /></Suspense>
+  )
 
   if (authLoading) return <Spinner />
   if (!session) {

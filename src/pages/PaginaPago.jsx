@@ -544,8 +544,12 @@ function Page({ children }) {
         @keyframes pulse { 0%,100% { opacity:1 } 50% { opacity:.5 } }
       `}</style>
       <div style={t.card}>{children}</div>
-      <p style={{ textAlign: 'center', color: '#222', fontSize: 11, marginTop: 14 }}>
+      <p style={{ textAlign: 'center', color: '#444', fontSize: 11, marginTop: 14 }}>
         Cobros automáticos por <strong style={{ color: '#333' }}>Cobraya</strong>
+        {' · '}
+        <a href="/privacidad" style={{ color: '#555', textDecoration: 'none' }}>Privacidad</a>
+        {' · '}
+        <a href="/terminos" style={{ color: '#555', textDecoration: 'none' }}>Términos</a>
       </p>
     </div>
   )

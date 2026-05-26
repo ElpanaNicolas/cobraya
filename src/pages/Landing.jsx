@@ -339,7 +339,11 @@ export function Landing() {
       {/* ── FOOTER ───────────────────────────────────────────── */}
       <footer style={{ background: '#0d0d0d', padding: '28px clamp(20px, 5vw, 80px)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
         <div style={{ fontFamily: 'var(--font-display)', fontSize: 18, color: '#fff', letterSpacing: '-0.02em' }}>Cobraya</div>
-        <div style={{ fontSize: 11, color: '#444' }}>© 2026 · Hecho en Uruguay 🇺🇾</div>
+        <div style={{ fontSize: 11, color: '#444', display: 'flex', gap: 16, alignItems: 'center' }}>
+          <span>© 2026 · Hecho en Uruguay 🇺🇾</span>
+          <a href="/privacidad" style={{ color: '#555', textDecoration: 'none' }}>Privacidad</a>
+          <a href="/terminos"   style={{ color: '#555', textDecoration: 'none' }}>Términos</a>
+        </div>
         <button onClick={goLogin} style={{ background: 'none', border: '1px solid #333', borderRadius: 6, padding: '6px 14px', color: '#666', fontSize: 11, fontFamily: 'var(--font-ui)', fontWeight: 700, cursor: 'pointer' }}>
           Iniciar sesión
         </button>
