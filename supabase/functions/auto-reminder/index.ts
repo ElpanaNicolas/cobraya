@@ -9,7 +9,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { callClaude } from '../_shared/claude.ts'
 import { sendEmail, reminderEmailHtml } from '../_shared/resend.ts'
-import { sendMetaWhatsApp } from '../_shared/meta-whatsapp.ts'
+import { sendMetaWhatsApp, sendMetaTemplate } from '../_shared/meta-whatsapp.ts'
 
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL')!,
@@ -48,6 +48,41 @@ async function alreadySentRecently(invoiceId: string, withinHours = 6): Promise<
   return (count ?? 0) > 0
 }
 
+async function hasRecentClientMessage(convId: string, withinHours = 24): Promise<boolean> {
+  const since = new Date(Date.now() - withinHours * 60 * 60 * 1000).toISOString()
+  const { count } = await supabase
+    .from('messages')
+    .select('id', { count: 'exact', head: true })
+    .eq('conversation_id', convId)
+    .eq('from_role', 'client')
+    .gte('sent_at', since)
+  return (count ?? 0) > 0
+}
+
+function buildReminderTemplate(
+  clientName: string,
+  company: string,
+  cfeId: string,
+  amount: number,
+  due: string,
+  paymentLink: string,
+): { name: string; components: unknown[] } {
+  return {
+    name: 'cobraya_cobro',
+    components: [{
+      type: 'body',
+      parameters: [
+        { type: 'text', text: clientName || 'Cliente' },
+        { type: 'text', text: company || 'la empresa' },
+        { type: 'text', text: cfeId },
+        { type: 'text', text: Number(amount).toLocaleString('es-AR') },
+        { type: 'text', text: due },
+        { type: 'text', text: paymentLink },
+      ],
+    }],
+  }
+}
+
 async function sendWhatsApp(to: string, body: string, sid: string, token: string, from: string) {
   const fmt = (n: string) => n.startsWith('whatsapp:') ? n : `whatsapp:${n}`
   const res = await fetch(
@@ -74,13 +109,18 @@ async function dispatchMessage(
   profile: Record<string, string>,
   cfg: Record<string, unknown>,
   convId: string,
+  templateData?: { name: string; components: unknown[] },
 ): Promise<void> {
   if (cfg.channel_whatsapp !== false) {
     const twilioSid   = profile.twilio_account_sid || Deno.env.get('TWILIO_ACCOUNT_SID')!
     const twilioToken = profile.twilio_auth_token  || Deno.env.get('TWILIO_AUTH_TOKEN')!
     const twilioFrom  = profile.twilio_wa_number   || Deno.env.get('TWILIO_WHATSAPP_NUMBER')!
     if (waProvider === 'meta' && profile.meta_phone_number_id && profile.meta_access_token) {
-      await sendMetaWhatsApp(phone, body, profile.meta_phone_number_id, profile.meta_access_token)
+      if (templateData) {
+        await sendMetaTemplate(phone, templateData.name, templateData.components, profile.meta_phone_number_id, profile.meta_access_token)
+      } else {
+        await sendMetaWhatsApp(phone, body, profile.meta_phone_number_id, profile.meta_access_token)
+      }
     } else if (twilioSid && twilioToken && twilioFrom) {
       await sendWhatsApp(phone, body, twilioSid, twilioToken, twilioFrom)
     }
@@ -204,13 +244,17 @@ serve(async (req) => {
           if (await alreadySentRecently(inv.id)) { stats.skipped++; continue }
           try {
             const paymentLink = `${APP_URL}/pagar/${inv.id}`
+            const convId = await ensureConversation(profile.id, client.id, inv.id)
+            let templateData: { name: string; components: unknown[] } | undefined
+            if (waProvider === 'meta' && profile.meta_phone_number_id && !(await hasRecentClientMessage(convId))) {
+              templateData = buildReminderTemplate(client.name, profile.company, inv.cfe_id, inv.amount, inv.due, paymentLink)
+            }
             const prompt = `Redactá un aviso amigable ${tone} recordando que la factura ${inv.cfe_id} por $${Number(inv.amount).toLocaleString('es-UY')} UYU vence en ${preDueDays} día${preDueDays > 1 ? 's' : ''} (el ${inv.due}). Incluí el link: ${paymentLink} — Máximo 3 oraciones. No uses listas. Firma: ${firma}`
             const msg = await callClaude(
               `Sos el asistente de cobros de ${profile.company ?? 'la empresa'}. Respondé solo con el mensaje de WhatsApp, sin comillas ni comentarios.`,
               [{ role: 'user', content: prompt }], 180, 'claude-haiku-4-5'
             )
-            const convId = await ensureConversation(profile.id, client.id, inv.id)
-            await dispatchMessage(client.phone, client.email, msg, waProvider, profile, cfg, convId)
+            await dispatchMessage(client.phone, client.email, msg, waProvider, profile, cfg, convId, templateData)
             console.log(`✓ Aviso previo (${preDueDays}d): ${inv.cfe_id} → ${client.name}`)
             stats.sent++
           } catch (err) {
@@ -238,13 +282,17 @@ serve(async (req) => {
         if (await alreadySentRecently(inv.id)) { stats.skipped++; continue }
         try {
           const paymentLink = `${APP_URL}/pagar/${inv.id}`
+          const convId = await ensureConversation(profile.id, client.id, inv.id)
+          let templateData: { name: string; components: unknown[] } | undefined
+          if (waProvider === 'meta' && profile.meta_phone_number_id && !(await hasRecentClientMessage(convId))) {
+            templateData = buildReminderTemplate(client.name, profile.company, inv.cfe_id, inv.amount, inv.due, paymentLink)
+          }
           const prompt = `Redactá un recordatorio de pago ${tone} para la factura ${inv.cfe_id} por $${Number(inv.amount).toLocaleString('es-UY')} UYU con vencimiento el ${inv.due}. Incluí el link: ${paymentLink} — Máximo 4 oraciones. No uses listas. Firma: ${firma}`
           const msg = await callClaude(
             `Sos el asistente de cobros de ${profile.company ?? 'la empresa'}. Respondé solo con el mensaje de WhatsApp, sin comillas ni comentarios.`,
             [{ role: 'user', content: prompt }], 200, 'claude-haiku-4-5'
           )
-          const convId = await ensureConversation(profile.id, client.id, inv.id)
-          await dispatchMessage(client.phone, client.email, msg, waProvider, profile, cfg, convId)
+          await dispatchMessage(client.phone, client.email, msg, waProvider, profile, cfg, convId, templateData)
           await supabase.from('invoices').update({ status: 'reminded' }).eq('id', inv.id)
           console.log(`✓ Recordatorio: ${inv.cfe_id} → ${client.name}`)
           stats.sent++
@@ -283,12 +331,16 @@ serve(async (req) => {
           if (lastMsg && new Date(lastMsg.sent_at) > followUpCutoff) { stats.skipped++; continue }
 
           const paymentLink = `${APP_URL}/pagar/${inv.id}`
+          let templateData: { name: string; components: unknown[] } | undefined
+          if (waProvider === 'meta' && profile.meta_phone_number_id && !(await hasRecentClientMessage(conv.id))) {
+            templateData = buildReminderTemplate(client.name, profile.company, inv.cfe_id, inv.amount, inv.due, paymentLink)
+          }
           const prompt = `Redactá un seguimiento de cobro ${tone} para la factura vencida ${inv.cfe_id} por $${Number(inv.amount).toLocaleString('es-UY')} UYU (venció el ${inv.due}). Es el mensaje nº ${agentMsgs.length + 1}. Incluí el link: ${paymentLink}${cfg.offer_payment_plan ? ` — Mencioná posibilidad de ${cfg.payment_plan_installments} cuotas.` : ''} Máximo 4 oraciones. Firma: ${firma}`
           const msg = await callClaude(
             `Sos el asistente de cobros de ${profile.company ?? 'la empresa'}. Respondé solo con el mensaje de WhatsApp, sin comillas ni comentarios.`,
             [{ role: 'user', content: prompt }], 200, 'claude-haiku-4-5'
           )
-          await dispatchMessage(client.phone, client.email, msg, waProvider, profile, cfg, conv.id)
+          await dispatchMessage(client.phone, client.email, msg, waProvider, profile, cfg, conv.id, templateData)
           await supabase.from('invoices').update({ status: 'ai_negotiating' }).eq('id', inv.id)
           console.log(`✓ Follow-up: ${inv.cfe_id} → ${client.name}`)
           stats.sent++
