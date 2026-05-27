@@ -31,6 +31,40 @@ export async function sendMetaWhatsApp(
   if (!res.ok) throw new Error(`Meta WA error: ${JSON.stringify(data.error ?? data)}`)
 }
 
+// Envía un mensaje usando una plantilla aprobada de Meta (requerida para mensajes iniciados por el negocio)
+export async function sendMetaTemplate(
+  to: string,
+  templateName: string,
+  components: unknown[],
+  phoneNumberId: string,
+  accessToken: string,
+  languageCode = 'es',
+): Promise<void> {
+  const phone = to.replace('whatsapp:', '').replace('+', '')
+
+  const res = await fetch(`${GRAPH_URL}/${phoneNumberId}/messages`, {
+    method: 'POST',
+    headers: {
+      Authorization:  `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      messaging_product: 'whatsapp',
+      recipient_type:    'individual',
+      to:                phone,
+      type:              'template',
+      template: {
+        name:       templateName,
+        language:   { code: languageCode },
+        components,
+      },
+    }),
+  })
+
+  const data = await res.json()
+  if (!res.ok) throw new Error(`Meta WA template error: ${JSON.stringify(data.error ?? data)}`)
+}
+
 // Descarga una imagen de Meta (necesita access token) y la devuelve en base64
 export async function fetchMetaImageAsBase64(
   mediaId: string,
