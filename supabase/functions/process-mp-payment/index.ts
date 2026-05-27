@@ -92,6 +92,29 @@ serve(async (req) => {
       .update({ status: 'paid' })
       .eq('id', invoiceId)
 
+    // Notificar al propietario del negocio
+    try {
+      const { data: { user: owner } } = await supabase.auth.admin.getUserById(invoice.profile_id)
+      const resendKey = Deno.env.get('RESEND_API_KEY')
+      if (owner?.email && resendKey) {
+        const clientName = (invoice.clients as { name?: string } | null)?.name ?? 'Cliente'
+        const amountStr  = new Intl.NumberFormat('es-UY', { style: 'currency', currency: 'UYU', minimumFractionDigits: 0 }).format(Number(invoice.amount))
+        await fetch('https://api.resend.com/emails', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            from:    'Cobraya <onboarding@resend.dev>',
+            to:      [owner.email],
+            subject: `💰 Pago recibido — ${invoice.cfe_id ?? 'Factura'}`,
+            html:    `<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"></head><body style="font-family:'Helvetica Neue',sans-serif;background:#f4f4f5;margin:0;padding:40px 16px"><div style="max-width:520px;margin:auto;background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.07)"><div style="background:#0a0a0a;padding:24px 32px"><span style="font-size:20px;font-weight:800;color:#fff">cobra<span style="color:#2d9e5f">ya</span></span></div><div style="padding:32px"><div style="font-size:32px;margin-bottom:12px">💰</div><h1 style="margin:0 0 8px;font-size:20px;font-weight:700;color:#111">¡Nuevo pago recibido!</h1><p style="margin:0 0 20px;font-size:14px;color:#555"><strong>${clientName}</strong> abonó la factura <strong>${invoice.cfe_id}</strong>.</p><div style="background:#f0faf4;border:1px solid #b2f0ca;border-radius:10px;padding:20px 24px;margin-bottom:20px"><div style="font-size:11px;color:#666;text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">Monto recibido</div><div style="font-size:26px;font-weight:800;color:#1a7a40">${amountStr}</div><div style="font-size:12px;color:#888;margin-top:6px">Vía MercadoPago</div></div><p style="margin:0;font-size:12px;color:#aaa">Procesado automáticamente por Cobraya.</p></div></div></body></html>`,
+          }),
+        })
+        console.log(`📧 Notificación al propietario enviada a ${owner.email}`)
+      }
+    } catch (e) {
+      console.error('Error notificando al propietario:', e)
+    }
+
     // Registrar el pago en conversations/messages si existe conversación activa
     const { data: conv } = await supabase
       .from('conversations')
