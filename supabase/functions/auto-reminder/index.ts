@@ -29,6 +29,25 @@ function isWithinWorkingHours(from: string, to: string): boolean {
   return hour >= fh && hour < th
 }
 
+// Verifica si ya se envió un mensaje para esta factura en las últimas N horas.
+// Previene duplicados por ejecuciones concurrentes del cron.
+async function alreadySentRecently(invoiceId: string, withinHours = 6): Promise<boolean> {
+  const since = new Date(Date.now() - withinHours * 60 * 60 * 1000).toISOString()
+  const { data: conv } = await supabase
+    .from('conversations')
+    .select('id')
+    .eq('invoice_id', invoiceId)
+    .maybeSingle()
+  if (!conv) return false
+  const { count } = await supabase
+    .from('messages')
+    .select('id', { count: 'exact', head: true })
+    .eq('conversation_id', conv.id)
+    .eq('from_role', 'agent')
+    .gte('sent_at', since)
+  return (count ?? 0) > 0
+}
+
 async function sendWhatsApp(to: string, body: string, sid: string, token: string, from: string) {
   const fmt = (n: string) => n.startsWith('whatsapp:') ? n : `whatsapp:${n}`
   const res = await fetch(
@@ -182,6 +201,7 @@ serve(async (req) => {
         for (const inv of upcoming ?? []) {
           const client = inv.clients as Record<string, string>
           if (!client?.phone) { stats.skipped++; continue }
+          if (await alreadySentRecently(inv.id)) { stats.skipped++; continue }
           try {
             const paymentLink = `${APP_URL}/pagar/${inv.id}`
             const prompt = `Redactá un aviso amigable ${tone} recordando que la factura ${inv.cfe_id} por $${Number(inv.amount).toLocaleString('es-UY')} UYU vence en ${preDueDays} día${preDueDays > 1 ? 's' : ''} (el ${inv.due}). Incluí el link: ${paymentLink} — Máximo 3 oraciones. No uses listas. Firma: ${firma}`
@@ -215,6 +235,7 @@ serve(async (req) => {
       for (const inv of pendingInvoices ?? []) {
         const client = inv.clients as Record<string, string>
         if (!client?.phone) { stats.skipped++; continue }
+        if (await alreadySentRecently(inv.id)) { stats.skipped++; continue }
         try {
           const paymentLink = `${APP_URL}/pagar/${inv.id}`
           const prompt = `Redactá un recordatorio de pago ${tone} para la factura ${inv.cfe_id} por $${Number(inv.amount).toLocaleString('es-UY')} UYU con vencimiento el ${inv.due}. Incluí el link: ${paymentLink} — Máximo 4 oraciones. No uses listas. Firma: ${firma}`
