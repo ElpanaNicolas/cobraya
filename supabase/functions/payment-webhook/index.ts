@@ -151,7 +151,14 @@ async function markPaid(invoiceId: string, via: string) {
 
   if (!inv || inv.status === 'paid') return false // ya estaba pagada
 
-  await supabase.from('invoices').update({ status: 'paid' }).eq('id', invoiceId)
+  // Update atómico: solo actualiza si aún sigue sin estar pagada (previene race condition)
+  const { count } = await supabase
+    .from('invoices')
+    .update({ status: 'paid' })
+    .eq('id', invoiceId)
+    .neq('status', 'paid')
+    .select('id', { count: 'exact', head: true })
+  if (!count) return false // otro proceso ya la marcó como pagada
   console.log(`✓ Factura ${invoiceId} marcada como pagada vía ${via}`)
 
   // Email de confirmación al cliente (falla silenciosa si no hay email/config)
@@ -200,9 +207,13 @@ serve(async (req) => {
     const paymentId = body.data?.id
     if (!paymentId) return new Response('ok', { status: 200 })
 
-    // Webhook token (protección del endpoint público)
+    // Webhook token (protección del endpoint público) — fail closed si no hay secret
     const webhookSecret = Deno.env.get('WEBHOOK_SECRET')
-    if (webhookSecret && url.searchParams.get('token') !== webhookSecret) {
+    if (!webhookSecret) {
+      console.error('WEBHOOK_SECRET no configurado — rechazando webhook')
+      return new Response('Unauthorized', { status: 401 })
+    }
+    if (url.searchParams.get('token') !== webhookSecret) {
       return new Response('Unauthorized', { status: 401 })
     }
 
