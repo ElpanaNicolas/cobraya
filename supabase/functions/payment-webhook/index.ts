@@ -137,12 +137,69 @@ async function sendPaymentConfirmationEmail(opts: {
   }
 }
 
+async function sendOwnerNotificationEmail(opts: {
+  ownerEmail: string
+  clientName: string
+  invoiceRef: string
+  amount: number
+  via: string
+}) {
+  const resendKey = Deno.env.get('RESEND_API_KEY')
+  if (!resendKey) return
+
+  const amountStr = new Intl.NumberFormat('es-UY', {
+    style: 'currency', currency: 'UYU', minimumFractionDigits: 0,
+  }).format(opts.amount)
+
+  const html = `<!DOCTYPE html>
+<html lang="es">
+<head><meta charset="utf-8"><title>Pago recibido</title></head>
+<body style="margin:0;padding:0;background:#f4f4f5;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif">
+  <table width="100%" cellpadding="0" cellspacing="0" style="padding:40px 16px"><tr><td align="center">
+    <table width="520" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,.07)">
+      <tr><td style="background:#0a0a0a;padding:24px 32px">
+        <span style="font-size:22px;font-weight:800;letter-spacing:-0.03em;color:#fff">cobra<span style="color:#2d9e5f">ya</span></span>
+      </td></tr>
+      <tr><td style="padding:32px">
+        <div style="font-size:36px;margin-bottom:12px">💰</div>
+        <h1 style="margin:0 0 8px;font-size:20px;font-weight:700;color:#111">¡Nuevo pago recibido!</h1>
+        <p style="margin:0 0 20px;font-size:14px;color:#555;line-height:1.5">
+          <strong>${opts.clientName}</strong> abonó la factura <strong>${opts.invoiceRef}</strong>.
+        </p>
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0faf4;border:1px solid #b2f0ca;border-radius:10px;margin-bottom:20px">
+          <tr><td style="padding:20px 24px">
+            <div style="font-size:11px;color:#666;text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px">Monto recibido</div>
+            <div style="font-size:26px;font-weight:800;color:#1a7a40;letter-spacing:-0.02em">${amountStr}</div>
+            <div style="font-size:12px;color:#888;margin-top:6px">Vía ${opts.via}</div>
+          </td></tr>
+        </table>
+        <p style="margin:0;font-size:12px;color:#aaa">Procesado automáticamente por Cobraya.</p>
+      </td></tr>
+    </table>
+  </td></tr></table>
+</body>
+</html>`
+
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${resendKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      from:    'Cobraya <onboarding@resend.dev>',
+      to:      [opts.ownerEmail],
+      subject: `💰 Pago recibido — Factura ${opts.invoiceRef}`,
+      html,
+    }),
+  })
+  if (!res.ok) console.error('Resend owner notification error:', await res.text())
+  else console.log(`📧 Notificación al propietario enviada a ${opts.ownerEmail}`)
+}
+
 // ── Marcar factura como pagada + enviar email ──────────────────────────────
 async function markPaid(invoiceId: string, via: string) {
   const { data: inv } = await supabase
     .from('invoices')
     .select(`
-      id, status, cfe_id, amount,
+      id, status, cfe_id, amount, profile_id,
       clients(name, email),
       profiles(company)
     `)
@@ -176,6 +233,22 @@ async function markPaid(invoiceId: string, via: string) {
       console.error('Error enviando email de confirmación:', e)
       // No relanzar — el pago ya fue procesado correctamente
     }
+  }
+
+  // Notificación al propietario del negocio
+  try {
+    const { data: { user: owner } } = await supabase.auth.admin.getUserById(inv.profile_id as string)
+    if (owner?.email) {
+      await sendOwnerNotificationEmail({
+        ownerEmail: owner.email,
+        clientName: (inv.clients as { name?: string } | null)?.name ?? 'Cliente',
+        invoiceRef: inv.cfe_id ?? invoiceId,
+        amount:     Number(inv.amount),
+        via,
+      })
+    }
+  } catch (e) {
+    console.error('Error notificando al propietario:', e)
   }
 
   return true
