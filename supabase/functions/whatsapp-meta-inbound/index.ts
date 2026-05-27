@@ -79,6 +79,10 @@ serve(async (req) => {
     }
 
     const accessToken = profile.meta_access_token as string
+    if (!accessToken?.trim()) {
+      console.error(`meta_access_token no configurado para phone_number_id: ${phoneNumberId}`)
+      return new Response('ok', { status: 200 })
+    }
 
     // ── 2. Encontrar el cliente ──────────────────────────────────
     const { data: client } = await supabase
